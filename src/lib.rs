@@ -11,11 +11,12 @@ use codec::{Decode, Encode};
 use frame_support::{
     decl_error, decl_event, decl_module, decl_storage,
     dispatch::DispatchResult,
-    traits::{ChangeMembers, Currency, Get, LockIdentifier, LockableCurrency},
+    ensure,
+    traits::{ChangeMembers, Currency, Get, LockIdentifier, LockableCurrency, WithdrawReasons},
     Parameter,
 };
 use sp_runtime::{
-    traits::{Dispatchable, EnsureOrigin},
+    traits::{CheckedAdd, Dispatchable, EnsureOrigin},
     DispatchError, Perbill,
 };
 use sp_std::prelude::Vec;
@@ -63,12 +64,15 @@ decl_error! {
         NotEnoughFunds,
         /// The application deposit is too small
         DepositTooSmall,
+
+        LockCreationOverflow,
     }
 }
 
 decl_storage! {
     trait Store for Module<T: Trait> as TcrModule {
         Applications get(applications): map hasher(blake2_256) T::AccountId => Application<T::AccountId, BalanceOf<T>>;
+        AmountLocked get(amount_locked): map hasher(blake2_256) T::AccountId => BalanceOf<T>;
     }
 }
 
@@ -79,6 +83,14 @@ decl_module! {
 
         pub fn apply(origin, metadata: Vec<u8>, deposit: BalanceOf<T>) -> DispatchResult {
             let sender = ensure_signed(origin)?;
+            ensure!(!<Applications<T>>::contains_key(sender.clone()), Error::<T>::ApplicationPending);
+            ensure!(deposit >= T::MinimumApplicationAmount::get(), Error::<T>::DepositTooSmall);
+
+            if T::Currency::free_balance(&sender) < deposit {
+                Err(Error::<T>::NotEnoughFunds)?;
+            }
+
+            Self::lock_for(sender.clone(), deposit)?;
 
             <Applications<T>>::insert(sender.clone(), Application {
                 candidate: sender.clone(),
@@ -89,5 +101,19 @@ decl_module! {
             Self::deposit_event(RawEvent::NewApplication(sender, deposit));
             Ok(())
         }
+    }
+}
+
+impl<T: Trait> Module<T> {
+    /// Do not just call `set_lock`, rather increase the locked amount
+    fn lock_for(who: T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
+        let to_lock = <AmountLocked<T>>::get(who.clone())
+            .checked_add(&amount)
+            .ok_or(Error::<T>::LockCreationOverflow)?;
+
+        T::Currency::set_lock(TCR_LOCK_ID, &who, to_lock, WithdrawReasons::all());
+        <AmountLocked<T>>::insert(who, to_lock);
+
+        Ok(())
     }
 }

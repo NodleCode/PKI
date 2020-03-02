@@ -104,53 +104,63 @@ fn apply_works() {
     })
 }
 
-// #[test]
-// fn can_not_apply_twice() {
-//     let mut total_imbalance = <PositiveImbalanceOf<Test>>::zero();
-//     let r =
-//         <Test as Trait>::Currency::deposit_creating(&CANDIDATE, MinimumApplicationAmount::get());
-//     total_imbalance.subsume(r);
+#[test]
+fn can_not_apply_twice() {
+    new_test_ext().execute_with(|| {
+        let mut total_imbalance = <PositiveImbalanceOf<Test>>::zero();
+        let r = <Test as Trait>::Currency::deposit_creating(
+            &CANDIDATE,
+            MinimumApplicationAmount::get(),
+        );
+        total_imbalance.subsume(r);
 
-//     assert_ok!(TestModule::apply(
-//         Origin::signed(CANDIDATE),
-//         vec![],
-//         MinimumApplicationAmount::get()
-//     ));
-//     assert_noop!(
-//         TestModule::apply(
-//             Origin::signed(CANDIDATE),
-//             vec![],
-//             MinimumApplicationAmount::get()
-//         ),
-//         Error::<Test>::ApplicationPending
-//     );
-// }
+        assert_ok!(TestModule::apply(
+            Origin::signed(CANDIDATE),
+            vec![],
+            MinimumApplicationAmount::get()
+        ));
+        assert_noop!(
+            TestModule::apply(
+                Origin::signed(CANDIDATE),
+                vec![],
+                MinimumApplicationAmount::get()
+            ),
+            Error::<Test>::ApplicationPending
+        );
+    })
+}
 
-// #[test]
-// fn can_not_apply_if_not_enough_tokens() {
-//     assert_noop!(
-//         TestModule::apply(
-//             Origin::signed(CANDIDATE),
-//             vec![],
-//             MinimumApplicationAmount::get()
-//         ),
-//         Error::<Test>::NotEnoughFunds
-//     );
-// }
+#[test]
+fn can_not_apply_if_not_enough_tokens() {
+    new_test_ext().execute_with(|| {
+        assert_noop!(
+            TestModule::apply(
+                Origin::signed(CANDIDATE),
+                vec![],
+                MinimumApplicationAmount::get()
+            ),
+            Error::<Test>::NotEnoughFunds
+        );
+    })
+}
 
-// #[test]
-// fn can_not_apply_if_too_deposit_is_too_low() {
-//     let mut total_imbalance = <PositiveImbalanceOf<Test>>::zero();
-//     let r =
-//         <Test as Trait>::Currency::deposit_creating(&CANDIDATE, MinimumApplicationAmount::get());
-//     total_imbalance.subsume(r);
+#[test]
+fn can_not_apply_if_deposit_is_too_low() {
+    new_test_ext().execute_with(|| {
+        let mut total_imbalance = <PositiveImbalanceOf<Test>>::zero();
+        let r = <Test as Trait>::Currency::deposit_creating(
+            &CANDIDATE,
+            MinimumApplicationAmount::get(),
+        );
+        total_imbalance.subsume(r);
 
-//     assert_noop!(
-//         TestModule::apply(
-//             Origin::signed(CANDIDATE),
-//             vec![],
-//             MinimumApplicationAmount::get() - 1
-//         ),
-//         Error::<Test>::DepositTooSmall
-//     );
-// }
+        assert_noop!(
+            TestModule::apply(
+                Origin::signed(CANDIDATE),
+                vec![],
+                MinimumApplicationAmount::get() - 1
+            ),
+            Error::<Test>::DepositTooSmall
+        );
+    })
+}
