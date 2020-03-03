@@ -72,6 +72,8 @@ type PositiveImbalanceOf<T> =
 
 const CANDIDATE: u64 = 1;
 const CHALLENGER: u64 = 2;
+const VOTER_FOR: u64 = 3;
+const VOTER_AGAINST: u64 = 4;
 
 type BalancesModule = pallet_balances::Module<Test>;
 type TestModule = Module<Test>;
@@ -91,8 +93,12 @@ fn allocate_balances() {
         <Test as Trait>::Currency::deposit_creating(&CANDIDATE, MinimumApplicationAmount::get());
     let r_challenger =
         <Test as Trait>::Currency::deposit_creating(&CHALLENGER, MinimumChallengeAmount::get());
+    let r_voter_for = <Test as Trait>::Currency::deposit_creating(&VOTER_FOR, 100);
+    let r_voter_against = <Test as Trait>::Currency::deposit_creating(&VOTER_AGAINST, 100);
     total_imbalance.subsume(r_candidate);
     total_imbalance.subsume(r_challenger);
+    total_imbalance.subsume(r_voter_for);
+    total_imbalance.subsume(r_voter_against);
 }
 
 #[test]
@@ -222,6 +228,8 @@ fn can_not_counter_application_if_not_enough_funds() {
                 metadata: vec![],
                 challenger: None,
                 challenger_deposit: None,
+                votes_for: None,
+                votes_against: None,
             },
         );
 
@@ -237,7 +245,7 @@ fn can_not_counter_application_if_not_enough_funds() {
 }
 
 #[test]
-fn can_not_reapply_if_pending_counter() {
+fn can_not_reapply_while_challenged() {
     new_test_ext().execute_with(|| {
         allocate_balances();
 
@@ -260,6 +268,85 @@ fn can_not_reapply_if_pending_counter() {
                 MinimumApplicationAmount::get()
             ),
             Error::<Test>::ApplicationChallenged
+        );
+    })
+}
+
+#[test]
+fn vote_positive_and_negative_works() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+
+        TestModule::apply(
+            Origin::signed(CANDIDATE),
+            vec![],
+            MinimumApplicationAmount::get(),
+        );
+
+        TestModule::counter(
+            Origin::signed(CHALLENGER),
+            CANDIDATE,
+            MinimumChallengeAmount::get(),
+        );
+
+        assert_ok!(TestModule::vote(
+            Origin::signed(VOTER_FOR),
+            CANDIDATE,
+            true,
+            100
+        ));
+        assert_ok!(TestModule::vote(
+            Origin::signed(VOTER_AGAINST),
+            CANDIDATE,
+            false,
+            100
+        ));
+
+        assert_eq!(<Challenges<Test>>::get(CANDIDATE).votes_for, Some(100));
+        assert_eq!(<Challenges<Test>>::get(CANDIDATE).votes_against, Some(100));
+        assert_eq!(
+            TestModule::get_supporting(CANDIDATE),
+            100 + MinimumApplicationAmount::get()
+        );
+        assert_eq!(
+            TestModule::get_opposing(CANDIDATE),
+            100 + MinimumChallengeAmount::get()
+        );
+    })
+}
+
+#[test]
+fn can_not_vote_if_challenge_does_not_exists() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+
+        assert_noop!(
+            TestModule::vote(Origin::signed(VOTER_FOR), CANDIDATE, true, 100),
+            Error::<Test>::ChallengeNotFound
+        );
+    })
+}
+
+#[test]
+fn can_not_deposit_if_not_enough_funds() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+
+        TestModule::apply(
+            Origin::signed(CANDIDATE),
+            vec![],
+            MinimumApplicationAmount::get(),
+        );
+
+        TestModule::counter(
+            Origin::signed(CHALLENGER),
+            CANDIDATE,
+            MinimumChallengeAmount::get(),
+        );
+
+        assert_noop!(
+            TestModule::vote(Origin::signed(VOTER_FOR), CANDIDATE, true, 101),
+            Error::<Test>::NotEnoughFunds
         );
     })
 }

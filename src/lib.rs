@@ -10,7 +10,7 @@ mod tests;
 use codec::{Decode, Encode};
 use frame_support::{
     decl_error, decl_event, decl_module, decl_storage,
-    dispatch::DispatchResult,
+    dispatch::{result::Result, DispatchResult},
     ensure,
     traits::{ChangeMembers, Currency, Get, LockIdentifier, LockableCurrency, WithdrawReasons},
     Parameter,
@@ -36,6 +36,9 @@ pub struct Application<AccountId, Balance> {
 
     challenger: Option<AccountId>,
     challenger_deposit: Option<Balance>,
+
+    votes_for: Option<Balance>,
+    votes_against: Option<Balance>,
 }
 
 /// The module's configuration trait.
@@ -60,6 +63,8 @@ decl_event!(
         NewApplication(AccountId, Balance),
         /// Someone countered an application
         ApplicationCountered(AccountId, AccountId, Balance),
+        /// A new vote for an application has been recorded
+        VoteRecorded(AccountId, AccountId, Balance, bool),
     }
 );
 
@@ -75,6 +80,8 @@ decl_error! {
         DepositTooSmall,
         /// The application linked to the member was not found
         ApplicationNotFound,
+        /// The challenge linked ot the member was not found
+        ChallengeNotFound,
 
         LockCreationOverflow,
     }
@@ -99,10 +106,6 @@ decl_module! {
             ensure!(!<Applications<T>>::contains_key(sender.clone()), Error::<T>::ApplicationPending);
             ensure!(!<Challenges<T>>::contains_key(sender.clone()), Error::<T>::ApplicationChallenged);
 
-            if T::Currency::free_balance(&sender) < deposit {
-                Err(Error::<T>::NotEnoughFunds)?;
-            }
-
             Self::lock_for(sender.clone(), deposit)?;
 
             <Applications<T>>::insert(sender.clone(), Application {
@@ -112,6 +115,9 @@ decl_module! {
 
                 challenger: None,
                 challenger_deposit: None,
+
+                votes_for: None,
+                votes_against: None,
             });
 
             Self::deposit_event(RawEvent::NewApplication(sender, deposit));
@@ -124,10 +130,6 @@ decl_module! {
             ensure!(deposit >= T::MinimumChallengeAmount::get(), Error::<T>::DepositTooSmall);
             ensure!(<Applications<T>>::contains_key(member.clone()), Error::<T>::ApplicationNotFound);
 
-            if T::Currency::free_balance(&sender) < deposit {
-                Err(Error::<T>::NotEnoughFunds)?;
-            }
-
             Self::lock_for(sender.clone(), deposit)?;
 
             let mut application = <Applications<T>>::take(member.clone());
@@ -139,12 +141,37 @@ decl_module! {
             Self::deposit_event(RawEvent::ApplicationCountered(member, sender, deposit));
             Ok(())
         }
+
+        /// Vote in support or opposition of a given challenge
+        pub fn vote(origin, member: T::AccountId, supporting: bool, deposit: BalanceOf<T>) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+            ensure!(<Challenges<T>>::contains_key(member.clone()), Error::<T>::ChallengeNotFound);
+
+            Self::lock_for(sender.clone(), deposit)?;
+
+            let mut application = <Challenges<T>>::take(member.clone());
+
+            if supporting {
+                application.votes_for = Some(Self::helper_vote_increment(application.votes_for, deposit)?);
+            } else {
+                application.votes_against = Some(Self::helper_vote_increment(application.votes_against, deposit)?);
+            }
+
+            <Challenges<T>>::insert(member.clone(), application);
+
+            Self::deposit_event(RawEvent::VoteRecorded(member, sender, deposit, supporting));
+            Ok(())
+        }
     }
 }
 
 impl<T: Trait> Module<T> {
     /// Do not just call `set_lock`, rather increase the locked amount
     fn lock_for(who: T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
+        if T::Currency::free_balance(&who) < amount {
+            Err(Error::<T>::NotEnoughFunds)?;
+        }
+
         let to_lock = <AmountLocked<T>>::get(who.clone())
             .checked_add(&amount)
             .ok_or(Error::<T>::LockCreationOverflow)?;
@@ -153,5 +180,32 @@ impl<T: Trait> Module<T> {
         <AmountLocked<T>>::insert(who, to_lock);
 
         Ok(())
+    }
+
+    /// Number of tokens supporting a given application
+    fn get_supporting(who: T::AccountId) -> BalanceOf<T> {
+        let application = <Challenges<T>>::get(who);
+        application.candidate_deposit + application.votes_for.unwrap_or(0.into())
+    }
+
+    /// Number of tokens opposing a given application
+    fn get_opposing(who: T::AccountId) -> BalanceOf<T> {
+        let application = <Challenges<T>>::get(who);
+        application.challenger_deposit.unwrap_or(0.into())
+            + application.votes_against.unwrap_or(0.into())
+    }
+
+    fn helper_vote_increment(
+        src_votes: Option<BalanceOf<T>>,
+        add_votes: BalanceOf<T>,
+    ) -> Result<BalanceOf<T>, DispatchError> {
+        let votes = match src_votes {
+            Some(votes) => votes,
+            None => 0.into(),
+        };
+        match votes.checked_add(&add_votes) {
+            Some(votes) => Ok(votes),
+            None => Err(DispatchError::Other("votes overflow")),
+        }
     }
 }
