@@ -58,17 +58,20 @@ impl pallet_balances::Trait for Test {
 }
 parameter_types! {
     pub const MinimumApplicationAmount: u64 = 100;
+    pub const MinimumChallengeAmount: u64 = 1000;
 }
 impl Trait for Test {
     type Event = ();
     type Currency = pallet_balances::Module<Self>;
     type MinimumApplicationAmount = MinimumApplicationAmount;
+    type MinimumChallengeAmount = MinimumChallengeAmount;
 }
 
 type PositiveImbalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::PositiveImbalance;
 
 const CANDIDATE: u64 = 1;
+const CHALLENGER: u64 = 2;
 
 type BalancesModule = pallet_balances::Module<Test>;
 type TestModule = Module<Test>;
@@ -82,15 +85,20 @@ fn new_test_ext() -> sp_io::TestExternalities {
         .into()
 }
 
+fn allocate_balances() {
+    let mut total_imbalance = <PositiveImbalanceOf<Test>>::zero();
+    let r_candidate =
+        <Test as Trait>::Currency::deposit_creating(&CANDIDATE, MinimumApplicationAmount::get());
+    let r_challenger =
+        <Test as Trait>::Currency::deposit_creating(&CHALLENGER, MinimumChallengeAmount::get());
+    total_imbalance.subsume(r_candidate);
+    total_imbalance.subsume(r_challenger);
+}
+
 #[test]
 fn apply_works() {
     new_test_ext().execute_with(|| {
-        let mut total_imbalance = <PositiveImbalanceOf<Test>>::zero();
-        let r = <Test as Trait>::Currency::deposit_creating(
-            &CANDIDATE,
-            MinimumApplicationAmount::get(),
-        );
-        total_imbalance.subsume(r);
+        allocate_balances();
 
         assert_ok!(TestModule::apply(
             Origin::signed(CANDIDATE),
@@ -107,12 +115,7 @@ fn apply_works() {
 #[test]
 fn can_not_apply_twice() {
     new_test_ext().execute_with(|| {
-        let mut total_imbalance = <PositiveImbalanceOf<Test>>::zero();
-        let r = <Test as Trait>::Currency::deposit_creating(
-            &CANDIDATE,
-            MinimumApplicationAmount::get(),
-        );
-        total_imbalance.subsume(r);
+        allocate_balances();
 
         assert_ok!(TestModule::apply(
             Origin::signed(CANDIDATE),
@@ -147,13 +150,6 @@ fn can_not_apply_if_not_enough_tokens() {
 #[test]
 fn can_not_apply_if_deposit_is_too_low() {
     new_test_ext().execute_with(|| {
-        let mut total_imbalance = <PositiveImbalanceOf<Test>>::zero();
-        let r = <Test as Trait>::Currency::deposit_creating(
-            &CANDIDATE,
-            MinimumApplicationAmount::get(),
-        );
-        total_imbalance.subsume(r);
-
         assert_noop!(
             TestModule::apply(
                 Origin::signed(CANDIDATE),
@@ -161,6 +157,109 @@ fn can_not_apply_if_deposit_is_too_low() {
                 MinimumApplicationAmount::get() - 1
             ),
             Error::<Test>::DepositTooSmall
+        );
+    })
+}
+
+#[test]
+fn counter_works() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+
+        TestModule::apply(
+            Origin::signed(CANDIDATE),
+            vec![],
+            MinimumApplicationAmount::get(),
+        );
+
+        assert_ok!(TestModule::counter(
+            Origin::signed(CHALLENGER),
+            CANDIDATE,
+            MinimumChallengeAmount::get()
+        ));
+
+        assert_eq!(<Applications<Test>>::contains_key(CANDIDATE), false);
+        assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), true);
+    })
+}
+
+#[test]
+fn can_not_counter_unexisting_application() {
+    new_test_ext().execute_with(|| {
+        assert_noop!(
+            TestModule::counter(
+                Origin::signed(CHALLENGER),
+                CANDIDATE,
+                MinimumChallengeAmount::get()
+            ),
+            Error::<Test>::ApplicationNotFound
+        );
+    })
+}
+
+#[test]
+fn can_not_counter_application_if_deposit_too_low() {
+    new_test_ext().execute_with(|| {
+        assert_noop!(
+            TestModule::counter(
+                Origin::signed(CHALLENGER),
+                CANDIDATE,
+                MinimumChallengeAmount::get() - 1
+            ),
+            Error::<Test>::DepositTooSmall
+        );
+    })
+}
+
+#[test]
+fn can_not_counter_application_if_not_enough_funds() {
+    new_test_ext().execute_with(|| {
+        <Applications<Test>>::insert(
+            CANDIDATE,
+            Application {
+                candidate: CANDIDATE,
+                candidate_deposit: 0,
+                metadata: vec![],
+                challenger: None,
+                challenger_deposit: None,
+            },
+        );
+
+        assert_noop!(
+            TestModule::counter(
+                Origin::signed(CHALLENGER),
+                CANDIDATE,
+                MinimumChallengeAmount::get()
+            ),
+            Error::<Test>::NotEnoughFunds
+        );
+    })
+}
+
+#[test]
+fn can_not_reapply_if_pending_counter() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+
+        TestModule::apply(
+            Origin::signed(CANDIDATE),
+            vec![],
+            MinimumApplicationAmount::get(),
+        );
+
+        assert_ok!(TestModule::counter(
+            Origin::signed(CHALLENGER),
+            CANDIDATE,
+            MinimumChallengeAmount::get()
+        ));
+
+        assert_noop!(
+            TestModule::apply(
+                Origin::signed(CANDIDATE),
+                vec![],
+                MinimumApplicationAmount::get()
+            ),
+            Error::<Test>::ApplicationChallenged
         );
     })
 }
