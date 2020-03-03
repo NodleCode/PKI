@@ -59,12 +59,16 @@ impl pallet_balances::Trait for Test {
 parameter_types! {
     pub const MinimumApplicationAmount: u64 = 100;
     pub const MinimumChallengeAmount: u64 = 1000;
+    pub const FinalizeApplicationPeriod: u64 = 100;
+    pub const FinalizeChallengePeriod: u64 = 101; // Happens later to ease unit tests
 }
 impl Trait for Test {
     type Event = ();
     type Currency = pallet_balances::Module<Self>;
     type MinimumApplicationAmount = MinimumApplicationAmount;
     type MinimumChallengeAmount = MinimumChallengeAmount;
+    type FinalizeApplicationPeriod = FinalizeApplicationPeriod;
+    type FinalizeChallengePeriod = FinalizeChallengePeriod;
 }
 
 type PositiveImbalanceOf<T> =
@@ -93,8 +97,8 @@ fn allocate_balances() {
         <Test as Trait>::Currency::deposit_creating(&CANDIDATE, MinimumApplicationAmount::get());
     let r_challenger =
         <Test as Trait>::Currency::deposit_creating(&CHALLENGER, MinimumChallengeAmount::get());
-    let r_voter_for = <Test as Trait>::Currency::deposit_creating(&VOTER_FOR, 100);
-    let r_voter_against = <Test as Trait>::Currency::deposit_creating(&VOTER_AGAINST, 100);
+    let r_voter_for = <Test as Trait>::Currency::deposit_creating(&VOTER_FOR, 1000);
+    let r_voter_against = <Test as Trait>::Currency::deposit_creating(&VOTER_AGAINST, 1000);
     total_imbalance.subsume(r_candidate);
     total_imbalance.subsume(r_challenger);
     total_imbalance.subsume(r_voter_for);
@@ -230,6 +234,8 @@ fn can_not_counter_application_if_not_enough_funds() {
                 challenger_deposit: None,
                 votes_for: None,
                 votes_against: None,
+                created_block: <system::Module<Test>>::block_number(),
+                challenged_block: <system::Module<Test>>::block_number(),
             },
         );
 
@@ -302,14 +308,15 @@ fn vote_positive_and_negative_works() {
             100
         ));
 
-        assert_eq!(<Challenges<Test>>::get(CANDIDATE).votes_for, Some(100));
-        assert_eq!(<Challenges<Test>>::get(CANDIDATE).votes_against, Some(100));
+        let challenge = <Challenges<Test>>::get(CANDIDATE);
+        assert_eq!(challenge.clone().votes_for, Some(100));
+        assert_eq!(challenge.clone().votes_against, Some(100));
         assert_eq!(
-            TestModule::get_supporting(CANDIDATE),
+            TestModule::get_supporting(challenge.clone()),
             100 + MinimumApplicationAmount::get()
         );
         assert_eq!(
-            TestModule::get_opposing(CANDIDATE),
+            TestModule::get_opposing(challenge.clone()),
             100 + MinimumChallengeAmount::get()
         );
     })
@@ -345,8 +352,153 @@ fn can_not_deposit_if_not_enough_funds() {
         );
 
         assert_noop!(
-            TestModule::vote(Origin::signed(VOTER_FOR), CANDIDATE, true, 101),
+            TestModule::vote(Origin::signed(VOTER_FOR), CANDIDATE, true, 1001),
             Error::<Test>::NotEnoughFunds
         );
+    })
+}
+
+#[test]
+fn finalize_application_if_not_challenged_and_enough_time_elapsed() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+
+        TestModule::apply(
+            Origin::signed(CANDIDATE),
+            vec![],
+            MinimumApplicationAmount::get(),
+        );
+
+        <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeApplicationPeriod::get() + <system::Module<Test>>::block_number());
+
+        assert_eq!(<Applications<Test>>::contains_key(CANDIDATE), false);
+        assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), false);
+        assert_eq!(<Members<Test>>::contains_key(CANDIDATE), true);
+    })
+}
+
+#[test]
+fn does_not_finalize_challenged_application() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+
+        TestModule::apply(
+            Origin::signed(CANDIDATE),
+            vec![],
+            MinimumApplicationAmount::get(),
+        );
+
+        TestModule::counter(
+            Origin::signed(CHALLENGER),
+            CANDIDATE,
+            MinimumChallengeAmount::get(),
+        );
+
+        <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeApplicationPeriod::get() + <system::Module<Test>>::block_number());
+
+        assert_eq!(<Applications<Test>>::contains_key(CANDIDATE), false);
+        assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), true);
+        assert_eq!(<Members<Test>>::contains_key(CANDIDATE), false);
+    })
+}
+
+#[test]
+fn does_not_finalize_application_if_not_enough_time_elapsed() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+
+        TestModule::apply(
+            Origin::signed(CANDIDATE),
+            vec![],
+            MinimumApplicationAmount::get(),
+        );
+
+        <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeApplicationPeriod::get() + <system::Module<Test>>::block_number() - 1);
+
+        assert_eq!(<Applications<Test>>::contains_key(CANDIDATE), true);
+        assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), false);
+        assert_eq!(<Members<Test>>::contains_key(CANDIDATE), false);
+    })
+}
+
+#[test]
+fn finalize_challenge_if_enough_time_elapsed_drop() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+
+        TestModule::apply(
+            Origin::signed(CANDIDATE),
+            vec![],
+            MinimumApplicationAmount::get(),
+        );
+
+        TestModule::counter(
+            Origin::signed(CHALLENGER),
+            CANDIDATE,
+            MinimumChallengeAmount::get(),
+        );
+
+        <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeChallengePeriod::get() + <system::Module<Test>>::block_number());
+
+        assert_eq!(<Applications<Test>>::contains_key(CANDIDATE), false);
+        assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), false);
+        assert_eq!(<Members<Test>>::contains_key(CANDIDATE), false); // Voted for rejection
+    })
+}
+
+#[test]
+fn finalize_challenge_if_enough_time_elapsed_accept() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+
+        TestModule::apply(
+            Origin::signed(CANDIDATE),
+            vec![],
+            MinimumApplicationAmount::get(),
+        );
+
+        TestModule::counter(
+            Origin::signed(CHALLENGER),
+            CANDIDATE,
+            MinimumChallengeAmount::get(),
+        );
+
+        TestModule::vote(
+            Origin::signed(VOTER_FOR),
+            CANDIDATE,
+            true,
+            1000, //MinimumChallengeAmount::get(),
+        );
+
+        <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeChallengePeriod::get() + <system::Module<Test>>::block_number());
+
+        assert_eq!(<Applications<Test>>::contains_key(CANDIDATE), false);
+        assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), false);
+        assert_eq!(<Members<Test>>::contains_key(CANDIDATE), true);
+    })
+}
+
+#[test]
+fn does_not_finalize_challenge_if_not_enough_time_elapsed() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+
+        TestModule::apply(
+            Origin::signed(CANDIDATE),
+            vec![],
+            MinimumApplicationAmount::get(),
+        );
+
+        TestModule::counter(
+            Origin::signed(CHALLENGER),
+            CANDIDATE,
+            MinimumChallengeAmount::get(),
+        );
+
+        <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeChallengePeriod::get() + <system::Module<Test>>::block_number() - 1);
+
+        assert_eq!(<Applications<Test>>::contains_key(CANDIDATE), false);
+        assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), true);
+        assert_eq!(<Members<Test>>::contains_key(CANDIDATE), false);
     })
 }

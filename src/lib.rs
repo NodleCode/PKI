@@ -29,7 +29,7 @@ type NegativeImbalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::NegativeImbalance;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
-pub struct Application<AccountId, Balance> {
+pub struct Application<AccountId, Balance, BlockNumber> {
     candidate: AccountId,
     candidate_deposit: Balance,
     metadata: Vec<u8>,
@@ -39,6 +39,9 @@ pub struct Application<AccountId, Balance> {
 
     votes_for: Option<Balance>,
     votes_against: Option<Balance>,
+
+    created_block: BlockNumber,
+    challenged_block: BlockNumber,
 }
 
 /// The module's configuration trait.
@@ -51,6 +54,10 @@ pub trait Trait: system::Trait {
     type MinimumApplicationAmount: Get<BalanceOf<Self>>;
     /// Minimum amount of tokens required to challenge an entry
     type MinimumChallengeAmount: Get<BalanceOf<Self>>;
+    /// How many blocks we need to wait for before validating an application
+    type FinalizeApplicationPeriod: Get<Self::BlockNumber>;
+    /// How many blocks we need to wait for before finalizing a challenge
+    type FinalizeChallengePeriod: Get<Self::BlockNumber>;
 }
 
 decl_event!(
@@ -65,6 +72,12 @@ decl_event!(
         ApplicationCountered(AccountId, AccountId, Balance),
         /// A new vote for an application has been recorded
         VoteRecorded(AccountId, AccountId, Balance, bool),
+        /// An application passed without being countered
+        ApplicationPassed(AccountId),
+        /// A challenge killed the given application
+        ChallengeRefusedApplication(AccountId),
+        /// A challenge accepted the application
+        ChallengeAcceptedApplication(AccountId),
     }
 );
 
@@ -89,8 +102,10 @@ decl_error! {
 
 decl_storage! {
     trait Store for Module<T: Trait> as TcrModule {
-        Applications get(applications): map hasher(blake2_256) T::AccountId => Application<T::AccountId, BalanceOf<T>>;
-        Challenges get(challenges): map hasher(blake2_256) T::AccountId => Application<T::AccountId, BalanceOf<T>>;
+        Applications get(applications): linked_map hasher(blake2_256) T::AccountId => Application<T::AccountId, BalanceOf<T>, T::BlockNumber>;
+        Challenges get(challenges): linked_map hasher(blake2_256) T::AccountId => Application<T::AccountId, BalanceOf<T>, T::BlockNumber>;
+        Members get(members): map hasher(blake2_256) T::AccountId => Application<T::AccountId, BalanceOf<T>, T::BlockNumber>;
+
         AmountLocked get(amount_locked): map hasher(blake2_256) T::AccountId => BalanceOf<T>;
     }
 }
@@ -118,6 +133,9 @@ decl_module! {
 
                 votes_for: None,
                 votes_against: None,
+
+                created_block: <system::Module<T>>::block_number(),
+                challenged_block: 0.into(),
             });
 
             Self::deposit_event(RawEvent::NewApplication(sender, deposit));
@@ -135,6 +153,7 @@ decl_module! {
             let mut application = <Applications<T>>::take(member.clone());
             application.challenger = Some(sender.clone());
             application.challenger_deposit = Some(deposit);
+            application.challenged_block = <system::Module<T>>::block_number();
 
             <Challenges<T>>::insert(member.clone(), application);
 
@@ -162,6 +181,12 @@ decl_module! {
             Self::deposit_event(RawEvent::VoteRecorded(member, sender, deposit, supporting));
             Ok(())
         }
+
+        /// At the end of each blocks, commit applications or challenges as needed
+        fn on_finalize(block: T::BlockNumber) {
+            Self::commit_applications(block);
+            Self::resolve_challenges(block);
+        }
     }
 }
 
@@ -183,14 +208,16 @@ impl<T: Trait> Module<T> {
     }
 
     /// Number of tokens supporting a given application
-    fn get_supporting(who: T::AccountId) -> BalanceOf<T> {
-        let application = <Challenges<T>>::get(who);
+    fn get_supporting(
+        application: Application<T::AccountId, BalanceOf<T>, T::BlockNumber>,
+    ) -> BalanceOf<T> {
         application.candidate_deposit + application.votes_for.unwrap_or(0.into())
     }
 
     /// Number of tokens opposing a given application
-    fn get_opposing(who: T::AccountId) -> BalanceOf<T> {
-        let application = <Challenges<T>>::get(who);
+    fn get_opposing(
+        application: Application<T::AccountId, BalanceOf<T>, T::BlockNumber>,
+    ) -> BalanceOf<T> {
         application.challenger_deposit.unwrap_or(0.into())
             + application.votes_against.unwrap_or(0.into())
     }
@@ -206,6 +233,37 @@ impl<T: Trait> Module<T> {
         match votes.checked_add(&add_votes) {
             Some(votes) => Ok(votes),
             None => Err(DispatchError::Other("votes overflow")),
+        }
+    }
+
+    fn commit_applications(block: T::BlockNumber) {
+        for (account_id, application) in <Applications<T>>::enumerate() {
+            if block - application.clone().created_block >= T::FinalizeApplicationPeriod::get() {
+                // In the case of a commited application, we only move the structure
+                // to the last list.
+
+                <Applications<T>>::remove(account_id.clone());
+                <Members<T>>::insert(account_id.clone(), application.clone());
+
+                Self::deposit_event(RawEvent::ApplicationPassed(account_id));
+            }
+        }
+    }
+
+    fn resolve_challenges(block: T::BlockNumber) {
+        for (account_id, application) in <Challenges<T>>::enumerate() {
+            if block - application.clone().challenged_block >= T::FinalizeChallengePeriod::get() {
+                if Self::get_supporting(application.clone())
+                    > Self::get_opposing(application.clone())
+                {
+                    <Members<T>>::insert(account_id.clone(), application.clone());
+                    Self::deposit_event(RawEvent::ChallengeAcceptedApplication(account_id.clone()));
+                } else {
+                    Self::deposit_event(RawEvent::ChallengeRefusedApplication(account_id.clone()));
+                }
+
+                <Challenges<T>>::remove(account_id.clone());
+            }
         }
     }
 }
