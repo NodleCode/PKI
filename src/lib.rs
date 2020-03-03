@@ -58,6 +58,9 @@ pub trait Trait: system::Trait {
     type FinalizeApplicationPeriod: Get<Self::BlockNumber>;
     /// How many blocks we need to wait for before finalizing a challenge
     type FinalizeChallengePeriod: Get<Self::BlockNumber>;
+    /// How do we slash loosing parties when challenges are finalized, application's
+    /// member will be slashed at the same value
+    type LoosersSlash: Get<Perbill>;
 }
 
 decl_event!(

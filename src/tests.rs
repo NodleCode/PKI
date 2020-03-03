@@ -61,6 +61,7 @@ parameter_types! {
     pub const MinimumChallengeAmount: u64 = 1000;
     pub const FinalizeApplicationPeriod: u64 = 100;
     pub const FinalizeChallengePeriod: u64 = 101; // Happens later to ease unit tests
+    pub const LoosersSlash: Perbill = Perbill::from_percent(50);
 }
 impl Trait for Test {
     type Event = ();
@@ -69,6 +70,7 @@ impl Trait for Test {
     type MinimumChallengeAmount = MinimumChallengeAmount;
     type FinalizeApplicationPeriod = FinalizeApplicationPeriod;
     type FinalizeChallengePeriod = FinalizeChallengePeriod;
+    type LoosersSlash = LoosersSlash;
 }
 
 type PositiveImbalanceOf<T> =
@@ -117,6 +119,10 @@ fn apply_works() {
         ));
         assert_eq!(
             TestModule::applications(CANDIDATE).candidate_deposit,
+            MinimumApplicationAmount::get()
+        );
+        assert_eq!(
+            BalancesModule::free_balance(CANDIDATE) - BalancesModule::usable_balance(CANDIDATE),
             MinimumApplicationAmount::get()
         );
     })
@@ -190,6 +196,11 @@ fn counter_works() {
 
         assert_eq!(<Applications<Test>>::contains_key(CANDIDATE), false);
         assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), true);
+
+        assert_eq!(
+            BalancesModule::free_balance(CHALLENGER) - BalancesModule::usable_balance(CHALLENGER),
+            MinimumChallengeAmount::get()
+        );
     })
 }
 
@@ -318,6 +329,16 @@ fn vote_positive_and_negative_works() {
         assert_eq!(
             TestModule::get_opposing(challenge.clone()),
             100 + MinimumChallengeAmount::get()
+        );
+
+        assert_eq!(
+            BalancesModule::free_balance(VOTER_FOR) - BalancesModule::usable_balance(VOTER_FOR),
+            100
+        );
+        assert_eq!(
+            BalancesModule::free_balance(VOTER_AGAINST)
+                - BalancesModule::usable_balance(VOTER_AGAINST),
+            100
         );
     })
 }
