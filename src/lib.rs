@@ -12,11 +12,13 @@ use frame_support::{
     decl_error, decl_event, decl_module, decl_storage,
     dispatch::{result::Result, DispatchResult},
     ensure,
-    traits::{ChangeMembers, Currency, Get, LockIdentifier, LockableCurrency, WithdrawReasons},
+    traits::{
+        ChangeMembers, Currency, Get, Imbalance, LockIdentifier, LockableCurrency, WithdrawReasons,
+    },
     Parameter,
 };
 use sp_runtime::{
-    traits::{CheckedAdd, Dispatchable, EnsureOrigin},
+    traits::{CheckedAdd, CheckedSub, Dispatchable, EnsureOrigin},
     DispatchError, Perbill,
 };
 use sp_std::prelude::Vec;
@@ -38,7 +40,9 @@ pub struct Application<AccountId, Balance, BlockNumber> {
     challenger_deposit: Option<Balance>,
 
     votes_for: Option<Balance>,
+    voters_for: Vec<(AccountId, Balance)>,
     votes_against: Option<Balance>,
+    voters_against: Vec<(AccountId, Balance)>,
 
     created_block: BlockNumber,
     challenged_block: BlockNumber,
@@ -100,6 +104,7 @@ decl_error! {
         ChallengeNotFound,
 
         LockCreationOverflow,
+        UnlockCreationOverflow,
     }
 }
 
@@ -135,7 +140,9 @@ decl_module! {
                 challenger_deposit: None,
 
                 votes_for: None,
+                voters_for: vec![],
                 votes_against: None,
+                voters_against: vec![],
 
                 created_block: <system::Module<T>>::block_number(),
                 challenged_block: 0.into(),
@@ -175,8 +182,10 @@ decl_module! {
 
             if supporting {
                 application.votes_for = Some(Self::helper_vote_increment(application.votes_for, deposit)?);
+                application.voters_for.push((sender.clone(), deposit));
             } else {
                 application.votes_against = Some(Self::helper_vote_increment(application.votes_against, deposit)?);
+                application.voters_against.push((sender.clone(), deposit));
             }
 
             <Challenges<T>>::insert(member.clone(), application);
@@ -187,8 +196,8 @@ decl_module! {
 
         /// At the end of each blocks, commit applications or challenges as needed
         fn on_finalize(block: T::BlockNumber) {
-            Self::commit_applications(block);
-            Self::resolve_challenges(block);
+            drop(Self::commit_applications(block));
+            drop(Self::resolve_challenges(block));
         }
     }
 }
@@ -208,6 +217,35 @@ impl<T: Trait> Module<T> {
         <AmountLocked<T>>::insert(who, to_lock);
 
         Ok(())
+    }
+
+    /// Decrease the locked amount of tokens
+    fn unlock_for(who: T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
+        let old_amount = <AmountLocked<T>>::take(who.clone());
+        let new_amount = old_amount
+            .checked_sub(&amount)
+            .ok_or(Error::<T>::UnlockCreationOverflow)?;
+
+        if new_amount == 0.into() {
+            T::Currency::remove_lock(TCR_LOCK_ID, &who);
+        } else {
+            T::Currency::set_lock(TCR_LOCK_ID, &who, new_amount, WithdrawReasons::all());
+        }
+
+        <AmountLocked<T>>::insert(who, new_amount);
+
+        Ok(())
+    }
+
+    /// Takes some funds away from a looser, deposit in our own account
+    fn slash_looser(who: T::AccountId, amount: BalanceOf<T>) -> NegativeImbalanceOf<T> {
+        let to_be_slashed = T::LoosersSlash::get() * amount; // Sorry buddy...
+        if T::Currency::can_slash(&who, to_be_slashed) {
+            let (imbalance, _remaining) = T::Currency::slash(&who, to_be_slashed);
+            imbalance
+        } else {
+            <NegativeImbalanceOf<T>>::zero()
+        }
     }
 
     /// Number of tokens supporting a given application
@@ -239,7 +277,7 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    fn commit_applications(block: T::BlockNumber) {
+    fn commit_applications(block: T::BlockNumber) -> DispatchResult {
         for (account_id, application) in <Applications<T>>::enumerate() {
             if block - application.clone().created_block >= T::FinalizeApplicationPeriod::get() {
                 // In the case of a commited application, we only move the structure
@@ -251,22 +289,87 @@ impl<T: Trait> Module<T> {
                 Self::deposit_event(RawEvent::ApplicationPassed(account_id));
             }
         }
+
+        Ok(())
     }
 
-    fn resolve_challenges(block: T::BlockNumber) {
+    fn resolve_challenges(block: T::BlockNumber) -> DispatchResult {
         for (account_id, application) in <Challenges<T>>::enumerate() {
             if block - application.clone().challenged_block >= T::FinalizeChallengePeriod::get() {
+                let mut to_slash: Vec<(T::AccountId, BalanceOf<T>)>;
+                let mut to_reward: Vec<(T::AccountId, BalanceOf<T>)>;
+
                 if Self::get_supporting(application.clone())
                     > Self::get_opposing(application.clone())
                 {
                     <Members<T>>::insert(account_id.clone(), application.clone());
+
+                    // The proposal passed, slash `challenger` and `voters_against`
+
+                    to_slash = application.clone().voters_against;
+                    if let Some(challenger) = application.clone().challenger {
+                        to_slash.push((
+                            challenger,
+                            application.clone().challenger_deposit.unwrap_or(0.into()),
+                        ));
+                    }
+
+                    to_reward = application.clone().voters_for;
+                    to_reward.push((
+                        application.clone().candidate,
+                        application.clone().candidate_deposit,
+                    ));
+
                     Self::deposit_event(RawEvent::ChallengeAcceptedApplication(account_id.clone()));
                 } else {
+                    // The proposal did not pass, slash `candidate` and `voters_for`
+
+                    to_slash = application.clone().voters_for;
+                    to_slash.push((
+                        application.clone().candidate,
+                        application.clone().candidate_deposit,
+                    ));
+
+                    to_reward = application.clone().voters_against;
+                    if let Some(challenger) = application.clone().challenger {
+                        to_reward.push((
+                            challenger,
+                            application.clone().challenger_deposit.unwrap_or(0.into()),
+                        ));
+                    }
+
                     Self::deposit_event(RawEvent::ChallengeRefusedApplication(account_id.clone()));
                 }
+
+                let total_winning_deposits: BalanceOf<T> = to_reward
+                    .iter()
+                    .fold(0.into(), |acc, (_a, deposit)| acc + *deposit);
+
+                // Execute slashes
+                let mut slashes_imbalance = <NegativeImbalanceOf<T>>::zero();
+                for (account_id, deposit) in to_slash {
+                    Self::unlock_for(account_id.clone(), deposit)?;
+                    let r = Self::slash_looser(account_id.clone(), deposit);
+                    slashes_imbalance.subsume(r);
+                }
+
+                // Execute rewards
+                let rewards_pool = slashes_imbalance.peek();
+                for (account_id, deposit) in to_reward {
+                    Self::unlock_for(account_id.clone(), deposit)?;
+
+                    // let share = deposit / total_winning_deposits;
+                    // let coins = share * rewards_pool;
+
+                    // Self::send_reward(account_id.clone(), coins);
+                }
+
+                // Self::send_remaining_rewards(application)
 
                 <Challenges<T>>::remove(account_id.clone());
             }
         }
+
+        Ok(())
     }
 }

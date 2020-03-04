@@ -108,6 +108,66 @@ fn allocate_balances() {
 }
 
 #[test]
+fn lock_unlock_works() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+
+        assert_eq!(
+            BalancesModule::usable_balance(CANDIDATE),
+            MinimumApplicationAmount::get()
+        );
+
+        assert_ok!(TestModule::lock_for(
+            CANDIDATE,
+            MinimumApplicationAmount::get() / 2
+        ));
+        assert_eq!(
+            BalancesModule::usable_balance(CANDIDATE),
+            MinimumApplicationAmount::get() / 2
+        );
+        assert_eq!(
+            <AmountLocked<Test>>::get(CANDIDATE),
+            MinimumApplicationAmount::get() / 2
+        );
+        assert_ok!(TestModule::lock_for(
+            CANDIDATE,
+            MinimumApplicationAmount::get() / 2
+        ));
+        assert_eq!(BalancesModule::usable_balance(CANDIDATE), 0);
+        assert_eq!(
+            <AmountLocked<Test>>::get(CANDIDATE),
+            MinimumApplicationAmount::get()
+        );
+        assert_noop!(
+            TestModule::lock_for(CANDIDATE, 1),
+            Error::<Test>::NotEnoughFunds
+        );
+
+        assert_ok!(TestModule::unlock_for(
+            CANDIDATE,
+            MinimumApplicationAmount::get() / 2
+        ));
+        assert_eq!(
+            BalancesModule::usable_balance(CANDIDATE),
+            MinimumApplicationAmount::get() / 2
+        );
+        assert_eq!(
+            <AmountLocked<Test>>::get(CANDIDATE),
+            MinimumApplicationAmount::get() / 2
+        );
+        assert_ok!(TestModule::unlock_for(
+            CANDIDATE,
+            MinimumApplicationAmount::get() / 2
+        ));
+        assert_eq!(
+            BalancesModule::usable_balance(CANDIDATE),
+            MinimumApplicationAmount::get()
+        );
+        assert_eq!(<AmountLocked<Test>>::get(CANDIDATE), 0);
+    })
+}
+
+#[test]
 fn apply_works() {
     new_test_ext().execute_with(|| {
         allocate_balances();
@@ -182,11 +242,11 @@ fn counter_works() {
     new_test_ext().execute_with(|| {
         allocate_balances();
 
-        TestModule::apply(
+        assert_ok!(TestModule::apply(
             Origin::signed(CANDIDATE),
             vec![],
             MinimumApplicationAmount::get(),
-        );
+        ));
 
         assert_ok!(TestModule::counter(
             Origin::signed(CHALLENGER),
@@ -244,7 +304,9 @@ fn can_not_counter_application_if_not_enough_funds() {
                 challenger: None,
                 challenger_deposit: None,
                 votes_for: None,
+                voters_for: vec![],
                 votes_against: None,
+                voters_against: vec![],
                 created_block: <system::Module<Test>>::block_number(),
                 challenged_block: <system::Module<Test>>::block_number(),
             },
@@ -266,11 +328,11 @@ fn can_not_reapply_while_challenged() {
     new_test_ext().execute_with(|| {
         allocate_balances();
 
-        TestModule::apply(
+        assert_ok!(TestModule::apply(
             Origin::signed(CANDIDATE),
             vec![],
             MinimumApplicationAmount::get(),
-        );
+        ));
 
         assert_ok!(TestModule::counter(
             Origin::signed(CHALLENGER),
@@ -294,17 +356,17 @@ fn vote_positive_and_negative_works() {
     new_test_ext().execute_with(|| {
         allocate_balances();
 
-        TestModule::apply(
+        assert_ok!(TestModule::apply(
             Origin::signed(CANDIDATE),
             vec![],
             MinimumApplicationAmount::get(),
-        );
+        ));
 
-        TestModule::counter(
+        assert_ok!(TestModule::counter(
             Origin::signed(CHALLENGER),
             CANDIDATE,
             MinimumChallengeAmount::get(),
-        );
+        ));
 
         assert_ok!(TestModule::vote(
             Origin::signed(VOTER_FOR),
@@ -360,17 +422,17 @@ fn can_not_deposit_if_not_enough_funds() {
     new_test_ext().execute_with(|| {
         allocate_balances();
 
-        TestModule::apply(
+        assert_ok!(TestModule::apply(
             Origin::signed(CANDIDATE),
             vec![],
             MinimumApplicationAmount::get(),
-        );
+        ));
 
-        TestModule::counter(
+        assert_ok!(TestModule::counter(
             Origin::signed(CHALLENGER),
             CANDIDATE,
             MinimumChallengeAmount::get(),
-        );
+        ));
 
         assert_noop!(
             TestModule::vote(Origin::signed(VOTER_FOR), CANDIDATE, true, 1001),
@@ -384,11 +446,11 @@ fn finalize_application_if_not_challenged_and_enough_time_elapsed() {
     new_test_ext().execute_with(|| {
         allocate_balances();
 
-        TestModule::apply(
+        assert_ok!(TestModule::apply(
             Origin::signed(CANDIDATE),
             vec![],
             MinimumApplicationAmount::get(),
-        );
+        ));
 
         <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeApplicationPeriod::get() + <system::Module<Test>>::block_number());
 
@@ -403,17 +465,17 @@ fn does_not_finalize_challenged_application() {
     new_test_ext().execute_with(|| {
         allocate_balances();
 
-        TestModule::apply(
+        assert_ok!(TestModule::apply(
             Origin::signed(CANDIDATE),
             vec![],
             MinimumApplicationAmount::get(),
-        );
+        ));
 
-        TestModule::counter(
+        assert_ok!(TestModule::counter(
             Origin::signed(CHALLENGER),
             CANDIDATE,
             MinimumChallengeAmount::get(),
-        );
+        ));
 
         <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeApplicationPeriod::get() + <system::Module<Test>>::block_number());
 
@@ -428,11 +490,11 @@ fn does_not_finalize_application_if_not_enough_time_elapsed() {
     new_test_ext().execute_with(|| {
         allocate_balances();
 
-        TestModule::apply(
+        assert_ok!(TestModule::apply(
             Origin::signed(CANDIDATE),
             vec![],
             MinimumApplicationAmount::get(),
-        );
+        ));
 
         <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeApplicationPeriod::get() + <system::Module<Test>>::block_number() - 1);
 
@@ -447,23 +509,40 @@ fn finalize_challenge_if_enough_time_elapsed_drop() {
     new_test_ext().execute_with(|| {
         allocate_balances();
 
-        TestModule::apply(
+        assert_ok!(TestModule::apply(
             Origin::signed(CANDIDATE),
             vec![],
             MinimumApplicationAmount::get(),
-        );
+        ));
 
-        TestModule::counter(
+        assert_ok!(TestModule::counter(
             Origin::signed(CHALLENGER),
             CANDIDATE,
             MinimumChallengeAmount::get(),
-        );
+        ));
+
+        assert_ok!(TestModule::vote(
+            Origin::signed(VOTER_FOR),
+            CANDIDATE,
+            true,
+            2,
+        ));
 
         <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeChallengePeriod::get() + <system::Module<Test>>::block_number());
 
         assert_eq!(<Applications<Test>>::contains_key(CANDIDATE), false);
         assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), false);
         assert_eq!(<Members<Test>>::contains_key(CANDIDATE), false); // Voted for rejection
+
+        // Refunded only a part of the amount paid
+        assert_eq!(BalancesModule::usable_balance(CANDIDATE), LoosersSlash::get() * MinimumApplicationAmount::get());
+        assert_eq!(BalancesModule::usable_balance(VOTER_FOR), 1000-LoosersSlash::get() * 2);
+
+        assert_eq!(BalancesModule::usable_balance(CHALLENGER), MinimumChallengeAmount::get());
+
+        assert_eq!(<AmountLocked<Test>>::get(CANDIDATE), 0);
+        assert_eq!(<AmountLocked<Test>>::get(VOTER_FOR), 0);
+        assert_eq!(<AmountLocked<Test>>::get(CHALLENGER), 0);
     })
 }
 
@@ -472,30 +551,49 @@ fn finalize_challenge_if_enough_time_elapsed_accept() {
     new_test_ext().execute_with(|| {
         allocate_balances();
 
-        TestModule::apply(
+        assert_ok!(TestModule::apply(
             Origin::signed(CANDIDATE),
             vec![],
             MinimumApplicationAmount::get(),
-        );
+        ));
 
-        TestModule::counter(
+        assert_ok!(TestModule::counter(
             Origin::signed(CHALLENGER),
             CANDIDATE,
             MinimumChallengeAmount::get(),
-        );
+        ));
 
-        TestModule::vote(
+        assert_ok!(TestModule::vote(
             Origin::signed(VOTER_FOR),
             CANDIDATE,
             true,
             1000, //MinimumChallengeAmount::get(),
-        );
+        ));
+
+        assert_ok!(TestModule::vote(
+            Origin::signed(VOTER_AGAINST),
+            CANDIDATE,
+            false,
+            2,
+        ));
 
         <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeChallengePeriod::get() + <system::Module<Test>>::block_number());
 
         assert_eq!(<Applications<Test>>::contains_key(CANDIDATE), false);
         assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), false);
         assert_eq!(<Members<Test>>::contains_key(CANDIDATE), true);
+
+        // Refunded only a part of the amount paid
+        assert_eq!(BalancesModule::usable_balance(CHALLENGER), LoosersSlash::get() * MinimumChallengeAmount::get());
+        assert_eq!(BalancesModule::usable_balance(VOTER_AGAINST), 1000-LoosersSlash::get() * 2);
+
+        assert_eq!(BalancesModule::usable_balance(CANDIDATE), MinimumApplicationAmount::get());
+        assert_eq!(BalancesModule::usable_balance(VOTER_FOR), 1000);
+
+        assert_eq!(<AmountLocked<Test>>::get(CANDIDATE), 0);
+        assert_eq!(<AmountLocked<Test>>::get(VOTER_FOR), 0);
+        assert_eq!(<AmountLocked<Test>>::get(VOTER_AGAINST), 0);
+        assert_eq!(<AmountLocked<Test>>::get(CHALLENGER), 0);
     })
 }
 
@@ -504,17 +602,17 @@ fn does_not_finalize_challenge_if_not_enough_time_elapsed() {
     new_test_ext().execute_with(|| {
         allocate_balances();
 
-        TestModule::apply(
+        assert_ok!(TestModule::apply(
             Origin::signed(CANDIDATE),
             vec![],
             MinimumApplicationAmount::get(),
-        );
+        ));
 
-        TestModule::counter(
+        assert_ok!(TestModule::counter(
             Origin::signed(CHALLENGER),
             CANDIDATE,
             MinimumChallengeAmount::get(),
-        );
+        ));
 
         <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeChallengePeriod::get() + <system::Module<Test>>::block_number() - 1);
 
