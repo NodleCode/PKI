@@ -13,7 +13,8 @@ use frame_support::{
     dispatch::{result::Result, DispatchResult},
     ensure,
     traits::{
-        ChangeMembers, Currency, Get, Imbalance, LockIdentifier, LockableCurrency, WithdrawReasons,
+        ChangeMembers, Currency, Get, Imbalance, LockIdentifier, ReservableCurrency,
+        WithdrawReasons,
     },
     Parameter,
 };
@@ -23,8 +24,6 @@ use sp_runtime::{
 };
 use sp_std::prelude::Vec;
 use system::ensure_signed;
-
-const TCR_LOCK_ID: LockIdentifier = *b"tcrstake";
 
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 type NegativeImbalanceOf<T> =
@@ -53,7 +52,7 @@ pub trait Trait: system::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 
     /// The currency used to represent the voting power
-    type Currency: LockableCurrency<Self::AccountId, Moment = Self::BlockNumber>;
+    type Currency: ReservableCurrency<Self::AccountId>;
     /// Minimum amount of tokens required to apply
     type MinimumApplicationAmount: Get<BalanceOf<Self>>;
     /// Minimum amount of tokens required to challenge an entry
@@ -103,8 +102,8 @@ decl_error! {
         /// The challenge linked ot the member was not found
         ChallengeNotFound,
 
-        LockCreationOverflow,
-        UnlockCreationOverflow,
+        ReserveOverflow,
+        UnreserveOverflow,
     }
 }
 
@@ -113,8 +112,6 @@ decl_storage! {
         Applications get(applications): linked_map hasher(blake2_256) T::AccountId => Application<T::AccountId, BalanceOf<T>, T::BlockNumber>;
         Challenges get(challenges): linked_map hasher(blake2_256) T::AccountId => Application<T::AccountId, BalanceOf<T>, T::BlockNumber>;
         Members get(members): map hasher(blake2_256) T::AccountId => Application<T::AccountId, BalanceOf<T>, T::BlockNumber>;
-
-        AmountLocked get(amount_locked): map hasher(blake2_256) T::AccountId => BalanceOf<T>;
     }
 }
 
@@ -129,7 +126,7 @@ decl_module! {
             ensure!(!<Applications<T>>::contains_key(sender.clone()), Error::<T>::ApplicationPending);
             ensure!(!<Challenges<T>>::contains_key(sender.clone()), Error::<T>::ApplicationChallenged);
 
-            Self::lock_for(sender.clone(), deposit)?;
+            Self::reserve_for(sender.clone(), deposit)?;
 
             <Applications<T>>::insert(sender.clone(), Application {
                 candidate: sender.clone(),
@@ -158,7 +155,7 @@ decl_module! {
             ensure!(deposit >= T::MinimumChallengeAmount::get(), Error::<T>::DepositTooSmall);
             ensure!(<Applications<T>>::contains_key(member.clone()), Error::<T>::ApplicationNotFound);
 
-            Self::lock_for(sender.clone(), deposit)?;
+            Self::reserve_for(sender.clone(), deposit)?;
 
             let mut application = <Applications<T>>::take(member.clone());
             application.challenger = Some(sender.clone());
@@ -176,7 +173,7 @@ decl_module! {
             let sender = ensure_signed(origin)?;
             ensure!(<Challenges<T>>::contains_key(member.clone()), Error::<T>::ChallengeNotFound);
 
-            Self::lock_for(sender.clone(), deposit)?;
+            Self::reserve_for(sender.clone(), deposit)?;
 
             let mut application = <Challenges<T>>::take(member.clone());
 
@@ -204,36 +201,18 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
     /// Do not just call `set_lock`, rather increase the locked amount
-    fn lock_for(who: T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
-        if T::Currency::free_balance(&who) < amount {
+    fn reserve_for(who: T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
+        // Make sure we can lock has many funds
+        if !T::Currency::can_reserve(&who, amount) {
             Err(Error::<T>::NotEnoughFunds)?;
         }
 
-        let to_lock = <AmountLocked<T>>::get(who.clone())
-            .checked_add(&amount)
-            .ok_or(Error::<T>::LockCreationOverflow)?;
-
-        T::Currency::set_lock(TCR_LOCK_ID, &who, to_lock, WithdrawReasons::all());
-        <AmountLocked<T>>::insert(who, to_lock);
-
-        Ok(())
+        T::Currency::reserve(&who, amount)
     }
 
     /// Decrease the locked amount of tokens
-    fn unlock_for(who: T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
-        let old_amount = <AmountLocked<T>>::take(who.clone());
-        let new_amount = old_amount
-            .checked_sub(&amount)
-            .ok_or(Error::<T>::UnlockCreationOverflow)?;
-
-        if new_amount == 0.into() {
-            T::Currency::remove_lock(TCR_LOCK_ID, &who);
-        } else {
-            T::Currency::set_lock(TCR_LOCK_ID, &who, new_amount, WithdrawReasons::all());
-        }
-
-        <AmountLocked<T>>::insert(who, new_amount);
-
+    fn unreserve_for(who: T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
+        drop(T::Currency::unreserve(&who, amount));
         Ok(())
     }
 
@@ -348,7 +327,7 @@ impl<T: Trait> Module<T> {
                 // Execute slashes
                 let mut slashes_imbalance = <NegativeImbalanceOf<T>>::zero();
                 for (account_id, deposit) in to_slash {
-                    Self::unlock_for(account_id.clone(), deposit)?;
+                    Self::unreserve_for(account_id.clone(), deposit)?;
                     let r = Self::slash_looser(account_id.clone(), deposit);
                     slashes_imbalance.subsume(r);
                 }
@@ -356,7 +335,7 @@ impl<T: Trait> Module<T> {
                 // Execute rewards
                 let rewards_pool = slashes_imbalance.peek();
                 for (account_id, deposit) in to_reward {
-                    Self::unlock_for(account_id.clone(), deposit)?;
+                    Self::unreserve_for(account_id.clone(), deposit)?;
 
                     // let share = deposit / total_winning_deposits;
                     // let coins = share * rewards_pool;

@@ -117,7 +117,7 @@ fn lock_unlock_works() {
             MinimumApplicationAmount::get()
         );
 
-        assert_ok!(TestModule::lock_for(
+        assert_ok!(TestModule::reserve_for(
             CANDIDATE,
             MinimumApplicationAmount::get() / 2
         ));
@@ -125,25 +125,17 @@ fn lock_unlock_works() {
             BalancesModule::usable_balance(CANDIDATE),
             MinimumApplicationAmount::get() / 2
         );
-        assert_eq!(
-            <AmountLocked<Test>>::get(CANDIDATE),
-            MinimumApplicationAmount::get() / 2
-        );
-        assert_ok!(TestModule::lock_for(
+        assert_ok!(TestModule::reserve_for(
             CANDIDATE,
             MinimumApplicationAmount::get() / 2
         ));
         assert_eq!(BalancesModule::usable_balance(CANDIDATE), 0);
-        assert_eq!(
-            <AmountLocked<Test>>::get(CANDIDATE),
-            MinimumApplicationAmount::get()
-        );
         assert_noop!(
-            TestModule::lock_for(CANDIDATE, 1),
+            TestModule::reserve_for(CANDIDATE, 1),
             Error::<Test>::NotEnoughFunds
         );
 
-        assert_ok!(TestModule::unlock_for(
+        assert_ok!(TestModule::unreserve_for(
             CANDIDATE,
             MinimumApplicationAmount::get() / 2
         ));
@@ -151,11 +143,7 @@ fn lock_unlock_works() {
             BalancesModule::usable_balance(CANDIDATE),
             MinimumApplicationAmount::get() / 2
         );
-        assert_eq!(
-            <AmountLocked<Test>>::get(CANDIDATE),
-            MinimumApplicationAmount::get() / 2
-        );
-        assert_ok!(TestModule::unlock_for(
+        assert_ok!(TestModule::unreserve_for(
             CANDIDATE,
             MinimumApplicationAmount::get() / 2
         ));
@@ -163,7 +151,6 @@ fn lock_unlock_works() {
             BalancesModule::usable_balance(CANDIDATE),
             MinimumApplicationAmount::get()
         );
-        assert_eq!(<AmountLocked<Test>>::get(CANDIDATE), 0);
     })
 }
 
@@ -182,7 +169,7 @@ fn apply_works() {
             MinimumApplicationAmount::get()
         );
         assert_eq!(
-            BalancesModule::free_balance(CANDIDATE) - BalancesModule::usable_balance(CANDIDATE),
+            BalancesModule::reserved_balance(CANDIDATE),
             MinimumApplicationAmount::get()
         );
     })
@@ -258,7 +245,7 @@ fn counter_works() {
         assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), true);
 
         assert_eq!(
-            BalancesModule::free_balance(CHALLENGER) - BalancesModule::usable_balance(CHALLENGER),
+            BalancesModule::reserved_balance(CHALLENGER),
             MinimumChallengeAmount::get()
         );
     })
@@ -393,15 +380,8 @@ fn vote_positive_and_negative_works() {
             100 + MinimumChallengeAmount::get()
         );
 
-        assert_eq!(
-            BalancesModule::free_balance(VOTER_FOR) - BalancesModule::usable_balance(VOTER_FOR),
-            100
-        );
-        assert_eq!(
-            BalancesModule::free_balance(VOTER_AGAINST)
-                - BalancesModule::usable_balance(VOTER_AGAINST),
-            100
-        );
+        assert_eq!(BalancesModule::reserved_balance(VOTER_FOR), 100);
+        assert_eq!(BalancesModule::reserved_balance(VOTER_AGAINST), 100);
     })
 }
 
@@ -539,10 +519,6 @@ fn finalize_challenge_if_enough_time_elapsed_drop() {
         assert_eq!(BalancesModule::usable_balance(VOTER_FOR), 1000-LoosersSlash::get() * 2);
 
         assert_eq!(BalancesModule::usable_balance(CHALLENGER), MinimumChallengeAmount::get());
-
-        assert_eq!(<AmountLocked<Test>>::get(CANDIDATE), 0);
-        assert_eq!(<AmountLocked<Test>>::get(VOTER_FOR), 0);
-        assert_eq!(<AmountLocked<Test>>::get(CHALLENGER), 0);
     })
 }
 
@@ -589,11 +565,6 @@ fn finalize_challenge_if_enough_time_elapsed_accept() {
 
         assert_eq!(BalancesModule::usable_balance(CANDIDATE), MinimumApplicationAmount::get());
         assert_eq!(BalancesModule::usable_balance(VOTER_FOR), 1000);
-
-        assert_eq!(<AmountLocked<Test>>::get(CANDIDATE), 0);
-        assert_eq!(<AmountLocked<Test>>::get(VOTER_FOR), 0);
-        assert_eq!(<AmountLocked<Test>>::get(VOTER_AGAINST), 0);
-        assert_eq!(<AmountLocked<Test>>::get(CHALLENGER), 0);
     })
 }
 
