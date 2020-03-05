@@ -9,6 +9,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, ConvertInto, IdentityLookup, OpaqueKeys},
     KeyTypeId, Perbill,
 };
+use std::cell::RefCell;
 
 impl_outer_origin! {
     pub enum Origin for Test {}
@@ -63,6 +64,23 @@ parameter_types! {
     pub const FinalizeChallengePeriod: u64 = 101; // Happens later to ease unit tests
     pub const LoosersSlash: Perbill = Perbill::from_percent(50);
 }
+thread_local! {
+    static MEMBERS: RefCell<Vec<u64>> = RefCell::new(vec![]);
+}
+pub struct TestChangeMembers;
+impl ChangeMembers<u64> for TestChangeMembers {
+    fn change_members_sorted(incoming: &[u64], outgoing: &[u64], new: &[u64]) {
+        let mut old_plus_incoming = MEMBERS.with(|m| m.borrow().to_vec());
+        old_plus_incoming.extend_from_slice(incoming);
+        old_plus_incoming.sort();
+        let mut new_plus_outgoing = new.to_vec();
+        new_plus_outgoing.extend_from_slice(outgoing);
+        new_plus_outgoing.sort();
+        assert_eq!(old_plus_incoming, new_plus_outgoing);
+
+        MEMBERS.with(|m| *m.borrow_mut() = new.to_vec());
+    }
+}
 impl Trait for Test {
     type Event = ();
     type Currency = pallet_balances::Module<Self>;
@@ -71,6 +89,7 @@ impl Trait for Test {
     type FinalizeApplicationPeriod = FinalizeApplicationPeriod;
     type FinalizeChallengePeriod = FinalizeChallengePeriod;
     type LoosersSlash = LoosersSlash;
+    type ChangeMembers = TestChangeMembers;
 }
 
 type PositiveImbalanceOf<T> =
@@ -585,6 +604,8 @@ fn finalize_challenge_if_enough_time_elapsed_accept() {
 
         assert_eq!(BalancesModule::usable_balance(VOTER_FOR), 1000 + voter_rewards);
         assert_eq!(BalancesModule::usable_balance(CANDIDATE), MinimumApplicationAmount::get() + candidate_rewards + dust);
+
+        assert_eq!(MEMBERS.with(|m| m.borrow().clone()), vec![CANDIDATE]);
     })
 }
 

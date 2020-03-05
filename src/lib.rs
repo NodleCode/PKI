@@ -66,6 +66,8 @@ pub trait Trait: system::Trait {
     /// How do we slash loosing parties when challenges are finalized, application's
     /// member will be slashed at the same value
     type LoosersSlash: Get<Perbill>;
+    /// Hook that we call whenever some members are added or removed from the TCR
+    type ChangeMembers: ChangeMembers<Self::AccountId>;
 }
 
 decl_event!(
@@ -113,7 +115,7 @@ decl_storage! {
     trait Store for Module<T: Trait> as TcrModule {
         Applications get(applications): linked_map hasher(blake2_256) T::AccountId => Application<T::AccountId, BalanceOf<T>, T::BlockNumber>;
         Challenges get(challenges): linked_map hasher(blake2_256) T::AccountId => Application<T::AccountId, BalanceOf<T>, T::BlockNumber>;
-        Members get(members): map hasher(blake2_256) T::AccountId => Application<T::AccountId, BalanceOf<T>, T::BlockNumber>;
+        Members get(members): linked_map hasher(blake2_256) T::AccountId => Application<T::AccountId, BalanceOf<T>, T::BlockNumber>;
     }
 }
 
@@ -275,6 +277,8 @@ impl<T: Trait> Module<T> {
     }
 
     fn resolve_challenges(block: T::BlockNumber) -> DispatchResult {
+        let mut new_members = vec![];
+
         for (account_id, application) in <Challenges<T>>::enumerate() {
             if block - application.clone().challenged_block >= T::FinalizeChallengePeriod::get() {
                 let mut to_slash: Vec<(T::AccountId, BalanceOf<T>)>;
@@ -284,6 +288,7 @@ impl<T: Trait> Module<T> {
                     > Self::get_opposing(application.clone())
                 {
                     <Members<T>>::insert(account_id.clone(), application.clone());
+                    new_members.push(application.clone().candidate);
 
                     // The proposal passed, slash `challenger` and `voters_against`
 
@@ -362,6 +367,14 @@ impl<T: Trait> Module<T> {
 
                 <Challenges<T>>::remove(account_id.clone());
             }
+        }
+
+        if new_members.len() > 0 {
+            let mut sorted_members = <Members<T>>::enumerate()
+                .map(|(a, _app)| a)
+                .collect::<Vec<_>>();
+            sorted_members.sort();
+            T::ChangeMembers::change_members_sorted(&new_members, &[], &sorted_members[..]);
         }
 
         Ok(())
