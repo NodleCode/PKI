@@ -28,7 +28,7 @@ type PositiveImbalanceOf<T> =
 pub struct Application<AccountId, Balance, BlockNumber> {
     candidate: AccountId,
     candidate_deposit: Balance,
-    metadata: Vec<u8>,
+    metadata: Vec<u8>, // For instance, a link or a name...
 
     challenger: Option<AccountId>,
     challenger_deposit: Option<Balance>,
@@ -50,7 +50,9 @@ pub trait Trait: system::Trait {
     type Currency: ReservableCurrency<Self::AccountId>;
     /// Minimum amount of tokens required to apply
     type MinimumApplicationAmount: Get<BalanceOf<Self>>;
-    /// Minimum amount of tokens required to challenge an entry
+    /// Minimum amount of tokens required to counter an application
+    type MinimumCounterAmount: Get<BalanceOf<Self>>;
+    /// Minimum amount of tokens required to challenge a member's application
     type MinimumChallengeAmount: Get<BalanceOf<Self>>;
     /// How many blocks we need to wait for before validating an application
     type FinalizeApplicationPeriod: Get<Self::BlockNumber>;
@@ -77,6 +79,8 @@ decl_event!(
         VoteRecorded(AccountId, AccountId, Balance, bool),
         /// An application passed without being countered
         ApplicationPassed(AccountId),
+        /// A member's application is being challenged
+        ApplicationChallenged(AccountId, AccountId, Balance),
         /// A challenge killed the given application
         ChallengeRefusedApplication(AccountId),
         /// A challenge accepted the application
@@ -98,6 +102,8 @@ decl_error! {
         ApplicationNotFound,
         /// The challenge linked ot the member was not found
         ChallengeNotFound,
+        /// The account id is not a member
+        MemberNotFound,
 
         ReserveOverflow,
         UnreserveOverflow,
@@ -149,7 +155,7 @@ decl_module! {
         /// Counter a pending application, this will initiate a challenge
         pub fn counter(origin, member: T::AccountId, deposit: BalanceOf<T>) -> DispatchResult {
             let sender = ensure_signed(origin)?;
-            ensure!(deposit >= T::MinimumChallengeAmount::get(), Error::<T>::DepositTooSmall);
+            ensure!(deposit >= T::MinimumCounterAmount::get(), Error::<T>::DepositTooSmall);
             ensure!(<Applications<T>>::contains_key(member.clone()), Error::<T>::ApplicationNotFound);
 
             Self::reserve_for(sender.clone(), deposit)?;
@@ -185,6 +191,29 @@ decl_module! {
             <Challenges<T>>::insert(member.clone(), application);
 
             Self::deposit_event(RawEvent::VoteRecorded(member, sender, deposit, supporting));
+            Ok(())
+        }
+
+        /// Trigger a new challenge to remove an existing member
+        pub fn challenge(origin, member: T::AccountId, deposit: BalanceOf<T>) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+            ensure!(deposit >= T::MinimumChallengeAmount::get(), Error::<T>::DepositTooSmall);
+            ensure!(<Members<T>>::contains_key(member.clone()), Error::<T>::MemberNotFound);
+
+            Self::reserve_for(sender.clone(), deposit)?;
+
+            let mut application = <Members<T>>::get(member.clone());
+            application.challenger = Some(sender.clone());
+            application.challenger_deposit = Some(deposit);
+            application.challenged_block = <system::Module<T>>::block_number();
+            application.votes_for = None;
+            application.voters_for = vec![];
+            application.votes_against = None;
+            application.voters_against = vec![];
+
+            <Challenges<T>>::insert(member.clone(), application);
+
+            Self::deposit_event(RawEvent::ApplicationChallenged(member, sender, deposit));
             Ok(())
         }
 
@@ -316,6 +345,9 @@ impl<T: Trait> Module<T> {
                             application.clone().challenger_deposit.unwrap_or(0.into()),
                         ));
                     }
+
+                    // If it is a member, remove it
+                    <Members<T>>::remove(application.clone().candidate);
 
                     Self::deposit_event(RawEvent::ChallengeRefusedApplication(account_id.clone()));
                 }
