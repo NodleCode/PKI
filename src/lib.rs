@@ -12,16 +12,9 @@ use frame_support::{
     decl_error, decl_event, decl_module, decl_storage,
     dispatch::{result::Result, DispatchResult},
     ensure,
-    traits::{
-        ChangeMembers, Currency, Get, Imbalance, LockIdentifier, ReservableCurrency,
-        WithdrawReasons,
-    },
-    Parameter,
+    traits::{ChangeMembers, Currency, Get, Imbalance, ReservableCurrency},
 };
-use sp_runtime::{
-    traits::{CheckedAdd, CheckedSub, Dispatchable, EnsureOrigin},
-    DispatchError, Perbill,
-};
+use sp_runtime::{traits::CheckedAdd, DispatchError, Perbill};
 use sp_std::prelude::Vec;
 use system::ensure_signed;
 

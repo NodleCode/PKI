@@ -5,9 +5,9 @@ use frame_support::{
 };
 use sp_core::H256;
 use sp_runtime::{
-    testing::{Header, UintAuthorityId},
-    traits::{BlakeTwo256, ConvertInto, IdentityLookup, OpaqueKeys},
-    KeyTypeId, Perbill,
+    testing::Header,
+    traits::{BlakeTwo256, IdentityLookup},
+    Perbill,
 };
 use std::cell::RefCell;
 
