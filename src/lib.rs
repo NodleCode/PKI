@@ -10,11 +10,11 @@ mod tests;
 use codec::{Decode, Encode};
 use frame_support::{
     decl_error, decl_event, decl_module, decl_storage,
-    dispatch::{result::Result, DispatchResult},
+    dispatch::{result::Result, DispatchError, DispatchResult},
     ensure,
     traits::{ChangeMembers, Currency, Get, Imbalance, ReservableCurrency},
 };
-use sp_runtime::{traits::CheckedAdd, DispatchError, Perbill};
+use sp_runtime::{traits::CheckedAdd, Perbill};
 use sp_std::prelude::Vec;
 use system::ensure_signed;
 
@@ -219,8 +219,19 @@ decl_module! {
 
         /// At the end of each blocks, commit applications or challenges as needed
         fn on_finalize(block: T::BlockNumber) {
-            drop(Self::commit_applications(block));
-            drop(Self::resolve_challenges(block));
+            let (mut new_1, mut old_1) = Self::commit_applications(block).unwrap_or((vec![], vec![]));
+            let (new_2, old_2) = Self::resolve_challenges(block).unwrap_or((vec![], vec![]));
+
+            // TODO: optimise all those array operations
+
+            // Should never be the same, so should not need some uniq checks
+            new_1.extend(new_2.clone());
+            old_1.extend(old_2.clone());
+
+            new_1.sort();
+            old_1.sort();
+
+            Self::notify_members_change(new_1, old_1);
         }
     }
 }
@@ -282,7 +293,11 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    fn commit_applications(block: T::BlockNumber) -> DispatchResult {
+    fn commit_applications(
+        block: T::BlockNumber,
+    ) -> Result<(Vec<T::AccountId>, Vec<T::AccountId>), DispatchError> {
+        let mut new_members = vec![];
+
         for (account_id, application) in <Applications<T>>::enumerate() {
             if block - application.clone().created_block >= T::FinalizeApplicationPeriod::get() {
                 // In the case of a commited application, we only move the structure
@@ -291,15 +306,20 @@ impl<T: Trait> Module<T> {
                 <Applications<T>>::remove(account_id.clone());
                 <Members<T>>::insert(account_id.clone(), application.clone());
 
+                new_members.push(account_id.clone());
+
                 Self::deposit_event(RawEvent::ApplicationPassed(account_id));
             }
         }
 
-        Ok(())
+        Ok((new_members, vec![]))
     }
 
-    fn resolve_challenges(block: T::BlockNumber) -> DispatchResult {
+    fn resolve_challenges(
+        block: T::BlockNumber,
+    ) -> Result<(Vec<T::AccountId>, Vec<T::AccountId>), DispatchError> {
         let mut new_members = vec![];
+        let mut old_members = vec![];
 
         for (account_id, application) in <Challenges<T>>::enumerate() {
             if block - application.clone().challenged_block >= T::FinalizeChallengePeriod::get() {
@@ -330,6 +350,12 @@ impl<T: Trait> Module<T> {
 
                     Self::deposit_event(RawEvent::ChallengeAcceptedApplication(account_id.clone()));
                 } else {
+                    // If it is a member, remove it
+                    if <Members<T>>::contains_key(application.clone().candidate) {
+                        <Members<T>>::remove(application.clone().candidate);
+                        old_members.push(application.clone().candidate);
+                    }
+
                     // The proposal did not pass, slash `candidate` and `voters_for`
 
                     to_slash = application.clone().voters_for;
@@ -345,9 +371,6 @@ impl<T: Trait> Module<T> {
                             application.clone().challenger_deposit.unwrap_or(0.into()),
                         ));
                     }
-
-                    // If it is a member, remove it
-                    <Members<T>>::remove(application.clone().candidate);
 
                     Self::deposit_event(RawEvent::ChallengeRefusedApplication(account_id.clone()));
                 }
@@ -394,14 +417,20 @@ impl<T: Trait> Module<T> {
             }
         }
 
-        if new_members.len() > 0 {
+        Ok((new_members, old_members))
+    }
+
+    fn notify_members_change(new_members: Vec<T::AccountId>, old_members: Vec<T::AccountId>) {
+        if new_members.len() > 0 || old_members.len() > 0 {
             let mut sorted_members = <Members<T>>::enumerate()
                 .map(|(a, _app)| a)
                 .collect::<Vec<_>>();
             sorted_members.sort();
-            T::ChangeMembers::change_members_sorted(&new_members, &[], &sorted_members[..]);
+            T::ChangeMembers::change_members_sorted(
+                &new_members,
+                &old_members,
+                &sorted_members[..],
+            );
         }
-
-        Ok(())
     }
 }

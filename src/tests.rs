@@ -77,6 +77,17 @@ impl ChangeMembers<u64> for TestChangeMembers {
         let mut new_plus_outgoing = new.to_vec();
         new_plus_outgoing.extend_from_slice(outgoing);
         new_plus_outgoing.sort();
+        // Useful to display content, consider it as a breakpoint
+        // assert_eq!(
+        //     Some((
+        //         incoming,
+        //         outgoing,
+        //         new,
+        //         old_plus_incoming.clone(),
+        //         new_plus_outgoing.clone()
+        //     )),
+        //     None
+        // );
         assert_eq!(old_plus_incoming, new_plus_outgoing);
 
         MEMBERS.with(|m| *m.borrow_mut() = new.to_vec());
@@ -458,6 +469,7 @@ fn finalize_application_if_not_challenged_and_enough_time_elapsed() {
         ));
 
         <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeApplicationPeriod::get() + <system::Module<Test>>::block_number());
+        assert_eq!(MEMBERS.with(|m| m.borrow().clone()), vec![CANDIDATE]);
 
         assert_eq!(<Applications<Test>>::contains_key(CANDIDATE), false);
         assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), false);
@@ -627,6 +639,7 @@ fn finalize_challenge_if_enough_time_elapsed_drop_and_kill_member() {
         ));
 
         <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeApplicationPeriod::get() + <system::Module<Test>>::block_number());
+        assert_eq!(MEMBERS.with(|m| m.borrow().clone()), vec![CANDIDATE]);
 
         assert_ok!(TestModule::challenge(
             Origin::signed(CHALLENGER_2),
@@ -635,6 +648,7 @@ fn finalize_challenge_if_enough_time_elapsed_drop_and_kill_member() {
         ));
 
         <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeChallengePeriod::get() + <system::Module<Test>>::block_number());
+        assert_eq!(MEMBERS.with(|m| m.borrow().clone()), vec![]);
 
         assert_eq!(<Applications<Test>>::contains_key(CANDIDATE), false);
         assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), false);
@@ -679,6 +693,7 @@ fn can_challenge_member_application() {
         ));
 
         <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeApplicationPeriod::get() + <system::Module<Test>>::block_number());
+        assert_eq!(MEMBERS.with(|m| m.borrow().clone()), vec![CANDIDATE]);
 
         assert_ok!(TestModule::challenge(
             Origin::signed(CHALLENGER_2),
@@ -701,6 +716,12 @@ fn can_challenge_member_application() {
         assert_eq!(<Challenges<Test>>::get(CANDIDATE).votes_against, None);
         assert_eq!(<Challenges<Test>>::get(CANDIDATE).voters_against, vec![]);
         assert_eq!(<Challenges<Test>>::get(CANDIDATE).challenged_block, <system::Module<Test>>::block_number());
+
+        <TestModule as sp_runtime::traits::OnFinalize<<Test as system::Trait>::BlockNumber>>::on_finalize(FinalizeChallengePeriod::get() + <system::Module<Test>>::block_number());
+        assert_eq!(MEMBERS.with(|m| m.borrow().clone()), vec![]);
+        assert_eq!(<Applications<Test>>::contains_key(CANDIDATE), false);
+        assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), false);
+        assert_eq!(<Members<Test>>::contains_key(CANDIDATE), false);
     })
 }
 
