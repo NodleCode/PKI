@@ -28,6 +28,8 @@ use system::ensure_signed;
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 type NegativeImbalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::NegativeImbalance;
+type PositiveImbalanceOf<T> =
+    <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::PositiveImbalance;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
 pub struct Application<AccountId, Balance, BlockNumber> {
@@ -333,17 +335,30 @@ impl<T: Trait> Module<T> {
                 }
 
                 // Execute rewards
+                let mut rewards_imbalance = <PositiveImbalanceOf<T>>::zero();
                 let rewards_pool = slashes_imbalance.peek();
-                for (account_id, deposit) in to_reward {
+                let mut allocated = 0.into();
+                for (account_id, deposit) in to_reward.clone() {
                     Self::unreserve_for(account_id.clone(), deposit)?;
 
-                    // let share = deposit / total_winning_deposits;
-                    // let coins = share * rewards_pool;
+                    // deposit          deposit * pool
+                    // ------- * pool = --------------
+                    //  total               total
+                    let coins = deposit * rewards_pool / total_winning_deposits;
 
-                    // Self::send_reward(account_id.clone(), coins);
+                    if let Ok(r) = T::Currency::deposit_into_existing(&account_id, coins) {
+                        allocated += r.peek();
+                        rewards_imbalance.subsume(r);
+                    }
                 }
 
-                // Self::send_remaining_rewards(application)
+                // Last element is `challenger` or `candidate`
+                if let Some((dust_collector, _deposit)) = to_reward.pop() {
+                    let remaining = rewards_pool - allocated;
+                    if let Ok(r) = T::Currency::deposit_into_existing(&dust_collector, remaining) {
+                        rewards_imbalance.subsume(r);
+                    }
+                }
 
                 <Challenges<T>>::remove(account_id.clone());
             }

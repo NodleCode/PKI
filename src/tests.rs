@@ -518,7 +518,12 @@ fn finalize_challenge_if_enough_time_elapsed_drop() {
         assert_eq!(BalancesModule::usable_balance(CANDIDATE), LoosersSlash::get() * MinimumApplicationAmount::get());
         assert_eq!(BalancesModule::usable_balance(VOTER_FOR), 1000-LoosersSlash::get() * 2);
 
-        assert_eq!(BalancesModule::usable_balance(CHALLENGER), MinimumChallengeAmount::get());
+        assert_eq!(
+            BalancesModule::usable_balance(CHALLENGER),
+            MinimumChallengeAmount::get()
+                + (MinimumApplicationAmount::get() - LoosersSlash::get() * MinimumApplicationAmount::get())
+                + (2-LoosersSlash::get() * 2)
+        );
     })
 }
 
@@ -563,8 +568,23 @@ fn finalize_challenge_if_enough_time_elapsed_accept() {
         assert_eq!(BalancesModule::usable_balance(CHALLENGER), LoosersSlash::get() * MinimumChallengeAmount::get());
         assert_eq!(BalancesModule::usable_balance(VOTER_AGAINST), 1000-LoosersSlash::get() * 2);
 
-        assert_eq!(BalancesModule::usable_balance(CANDIDATE), MinimumApplicationAmount::get());
-        assert_eq!(BalancesModule::usable_balance(VOTER_FOR), 1000);
+        let rewards_pool = (MinimumChallengeAmount::get() - LoosersSlash::get() * MinimumChallengeAmount::get())
+            + (2-LoosersSlash::get() * 2);
+        let shares = rewards_pool as f64 / (MinimumApplicationAmount::get() as f64 + 1000 as f64);
+        let candidate_rewards = (shares * MinimumApplicationAmount::get() as f64) as u64;
+        let voter_rewards = (shares * 1000_f64) as u64;
+
+        assert_eq!(rewards_pool >= candidate_rewards + voter_rewards, true);
+        //let dust = rewards_pool - candidate_rewards + voter_rewards;
+        let allocated = candidate_rewards + voter_rewards;
+        let dust = rewards_pool - allocated;
+
+        //assert_eq!(rewards_pool, 501);
+        //assert_eq!(allocated, 500);
+        //assert_eq!(dust, 1);
+
+        assert_eq!(BalancesModule::usable_balance(VOTER_FOR), 1000 + voter_rewards);
+        assert_eq!(BalancesModule::usable_balance(CANDIDATE), MinimumApplicationAmount::get() + candidate_rewards + dust);
     })
 }
 
