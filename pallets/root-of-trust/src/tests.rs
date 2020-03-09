@@ -79,6 +79,7 @@ impl pallet_tcr::Trait for Test {
 impl Trait for Test {
     type Event = ();
     type Currency = pallet_balances::Module<Self>;
+    type CertificateId = <Test as system::Trait>::AccountId;
 }
 
 type PositiveImbalanceOf<T> =
@@ -124,5 +125,63 @@ fn tcr_membership_propagate() {
 
         assert_eq!(TestModule::is_member(&ROOT_MANAGER), true);
         assert_eq!(TestModule::is_member(&OFFCHAIN_CERTIFICATE_SIGNER), false);
+    })
+}
+
+#[test]
+fn non_member_can_not_buy_slots() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+
+        assert_noop!(
+            TestModule::book_slot(Origin::signed(ROOT_MANAGER), OFFCHAIN_CERTIFICATE_SIGNER),
+            Error::<Test>::NotAMember
+        );
+    })
+}
+
+#[test]
+fn can_not_buy_slot_twice() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER
+        ));
+        assert_noop!(
+            TestModule::book_slot(Origin::signed(ROOT_MANAGER), OFFCHAIN_CERTIFICATE_SIGNER),
+            Error::<Test>::SlotTaken
+        );
+    })
+}
+
+#[test]
+fn member_can_buy_slots() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER
+        ));
+        assert_eq!(
+            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER).key,
+            OFFCHAIN_CERTIFICATE_SIGNER
+        );
+        assert_eq!(
+            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER).owner,
+            ROOT_MANAGER
+        );
+        assert_eq!(
+            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER).created,
+            <system::Module<Test>>::block_number()
+        );
+        assert_eq!(
+            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER).renewed,
+            <system::Module<Test>>::block_number()
+        );
     })
 }

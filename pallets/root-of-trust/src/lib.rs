@@ -13,20 +13,24 @@ use frame_support::{
     dispatch::{result::Result, DispatchError, DispatchResult},
     ensure,
     traits::{ChangeMembers, Currency, Get, Imbalance},
+    Parameter,
 };
 use frame_system::{self as system, ensure_signed};
-use sp_runtime::{traits::CheckedAdd, Perbill};
-use sp_std::prelude::Vec;
+use sp_runtime::{
+    traits::{CheckedAdd, MaybeDisplay, MaybeSerializeDeserialize, Member},
+    Perbill,
+};
+use sp_std::{fmt::Debug, prelude::Vec};
 
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 type NegativeImbalanceOf<T> =
     <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::NegativeImbalance;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
-pub struct RootCertificate<AccountId, BlockNumber> {
+pub struct RootCertificate<AccountId, CertificateId, BlockNumber> {
     owner: AccountId,
-    key: AccountId,
-    creation: BlockNumber,
+    key: CertificateId,
+    created: BlockNumber,
     renewed: BlockNumber,
 }
 
@@ -36,27 +40,41 @@ pub trait Trait: system::Trait {
 
     /// The currency used to represent the voting power
     type Currency: Currency<Self::AccountId>;
+
+    /// How a certificate public key is represented, typically `AccountId`
+    type CertificateId: Member
+        + Parameter
+        + MaybeSerializeDeserialize
+        + Debug
+        + MaybeDisplay
+        + Ord
+        + Default;
 }
 
 decl_event!(
     pub enum Event<T>
     where
         AccountId = <T as system::Trait>::AccountId,
-        Balance = BalanceOf<T>,
+        CertificateId = <T as Trait>::CertificateId,
     {
-        Placeholder(AccountId, Balance),
+        /// A new slot has been booked
+        SlotTaken(AccountId, CertificateId),
     }
 );
 
 decl_error! {
     pub enum Error for Module<T: Trait> {
-        Placeholder,
+        /// `origin` a member, this function may need a member account id
+        NotAMember,
+        /// Slot was already taken, you will need to use another certificate id
+        SlotTaken,
     }
 }
 
 decl_storage! {
     trait Store for Module<T: Trait> as RootOfTrustModule {
         Members get(members): Vec<T::AccountId>;
+        Slots get(slots): map hasher(blake2_256) T::CertificateId => RootCertificate<T::AccountId, T::CertificateId, T::BlockNumber>;
     }
 }
 
@@ -64,6 +82,24 @@ decl_module! {
     /// The module declaration.
     pub struct Module<T: Trait> for enum Call where origin: T::Origin {
         fn deposit_event() = default;
+
+        /// Book a certificate slot
+        fn book_slot(origin, certificate_id: T::CertificateId) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+            ensure!(Self::is_member(&sender), Error::<T>::NotAMember);
+            ensure!(!<Slots<T>>::contains_key(&certificate_id), Error::<T>::SlotTaken);
+
+            let now = <system::Module<T>>::block_number();
+            <Slots<T>>::insert(&certificate_id, RootCertificate {
+                owner: sender.clone(),
+                key: certificate_id.clone(),
+                created: now,
+                renewed: now,
+            });
+
+            Self::deposit_event(RawEvent::SlotTaken(sender, certificate_id));
+            Ok(())
+        }
     }
 }
 
