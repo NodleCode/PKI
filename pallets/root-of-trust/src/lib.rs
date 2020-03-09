@@ -12,7 +12,10 @@ use frame_support::{
     decl_error, decl_event, decl_module, decl_storage,
     dispatch::{result::Result, DispatchError, DispatchResult},
     ensure,
-    traits::{ChangeMembers, Currency, Get, Imbalance},
+    traits::{
+        ChangeMembers, Currency, ExistenceRequirement, Get, Imbalance, OnUnbalanced,
+        WithdrawReasons,
+    },
     Parameter,
 };
 use frame_system::{self as system, ensure_signed};
@@ -49,6 +52,11 @@ pub trait Trait: system::Trait {
         + MaybeDisplay
         + Ord
         + Default;
+    /// How much a new root certificate costs
+    type SlotCost: Get<BalanceOf<Self>>;
+    /// The module receiving funds paid by depositors, typically a company
+    /// reserve
+    type FundsCollector: OnUnbalanced<NegativeImbalanceOf<Self>>;
 }
 
 decl_event!(
@@ -68,6 +76,8 @@ decl_error! {
         NotAMember,
         /// Slot was already taken, you will need to use another certificate id
         SlotTaken,
+        /// Not enough funds to pay the fee
+        NotEnoughFunds,
     }
 }
 
@@ -88,6 +98,11 @@ decl_module! {
             let sender = ensure_signed(origin)?;
             ensure!(Self::is_member(&sender), Error::<T>::NotAMember);
             ensure!(!<Slots<T>>::contains_key(&certificate_id), Error::<T>::SlotTaken);
+
+            match T::Currency::withdraw(&sender, T::SlotCost::get(), WithdrawReasons::all(), ExistenceRequirement::AllowDeath) {
+                Ok(imbalance) => T::FundsCollector::on_unbalanced(imbalance),
+                Err(_) => Err(Error::<T>::NotEnoughFunds)?,
+            };
 
             let now = <system::Module<T>>::block_number();
             <Slots<T>>::insert(&certificate_id, RootCertificate {

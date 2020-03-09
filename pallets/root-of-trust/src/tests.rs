@@ -76,10 +76,15 @@ impl pallet_tcr::Trait for Test {
     type LoosersSlash = LoosersSlash;
     type ChangeMembers = TestModule;
 }
+parameter_types! {
+    pub const SlotCost: u64 = 1000;
+}
 impl Trait for Test {
     type Event = ();
     type Currency = pallet_balances::Module<Self>;
     type CertificateId = <Test as system::Trait>::AccountId;
+    type SlotCost = SlotCost;
+    type FundsCollector = ();
 }
 
 type PositiveImbalanceOf<T> =
@@ -90,7 +95,8 @@ type TcrModule = pallet_tcr::Module<Test>;
 type TestModule = Module<Test>;
 
 const ROOT_MANAGER: u64 = 1;
-const OFFCHAIN_CERTIFICATE_SIGNER: u64 = 2;
+const OFFCHAIN_CERTIFICATE_SIGNER_1: u64 = 2;
+const OFFCHAIN_CERTIFICATE_SIGNER_2: u64 = 3;
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.
@@ -103,8 +109,10 @@ fn new_test_ext() -> sp_io::TestExternalities {
 
 fn allocate_balances() {
     let mut total_imbalance = <PositiveImbalanceOf<Test>>::zero();
-    let r_manager =
-        <Test as Trait>::Currency::deposit_creating(&ROOT_MANAGER, MinimumApplicationAmount::get());
+    let r_manager = <Test as Trait>::Currency::deposit_creating(
+        &ROOT_MANAGER,
+        MinimumApplicationAmount::get() + SlotCost::get(),
+    );
     total_imbalance.subsume(r_manager);
 }
 
@@ -124,7 +132,7 @@ fn tcr_membership_propagate() {
         do_register();
 
         assert_eq!(TestModule::is_member(&ROOT_MANAGER), true);
-        assert_eq!(TestModule::is_member(&OFFCHAIN_CERTIFICATE_SIGNER), false);
+        assert_eq!(TestModule::is_member(&OFFCHAIN_CERTIFICATE_SIGNER_1), false);
     })
 }
 
@@ -134,7 +142,7 @@ fn non_member_can_not_buy_slots() {
         allocate_balances();
 
         assert_noop!(
-            TestModule::book_slot(Origin::signed(ROOT_MANAGER), OFFCHAIN_CERTIFICATE_SIGNER),
+            TestModule::book_slot(Origin::signed(ROOT_MANAGER), OFFCHAIN_CERTIFICATE_SIGNER_1),
             Error::<Test>::NotAMember
         );
     })
@@ -148,11 +156,28 @@ fn can_not_buy_slot_twice() {
 
         assert_ok!(TestModule::book_slot(
             Origin::signed(ROOT_MANAGER),
-            OFFCHAIN_CERTIFICATE_SIGNER
+            OFFCHAIN_CERTIFICATE_SIGNER_1
         ));
         assert_noop!(
-            TestModule::book_slot(Origin::signed(ROOT_MANAGER), OFFCHAIN_CERTIFICATE_SIGNER),
+            TestModule::book_slot(Origin::signed(ROOT_MANAGER), OFFCHAIN_CERTIFICATE_SIGNER_1),
             Error::<Test>::SlotTaken
+        );
+    })
+}
+
+#[test]
+fn can_not_buy_slot_if_not_enough_funds() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+        assert_noop!(
+            TestModule::book_slot(Origin::signed(ROOT_MANAGER), OFFCHAIN_CERTIFICATE_SIGNER_2),
+            Error::<Test>::NotEnoughFunds
         );
     })
 }
@@ -165,23 +190,28 @@ fn member_can_buy_slots() {
 
         assert_ok!(TestModule::book_slot(
             Origin::signed(ROOT_MANAGER),
-            OFFCHAIN_CERTIFICATE_SIGNER
+            OFFCHAIN_CERTIFICATE_SIGNER_1
         ));
         assert_eq!(
-            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER).key,
-            OFFCHAIN_CERTIFICATE_SIGNER
+            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER_1).key,
+            OFFCHAIN_CERTIFICATE_SIGNER_1
         );
         assert_eq!(
-            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER).owner,
+            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER_1).owner,
             ROOT_MANAGER
         );
         assert_eq!(
-            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER).created,
+            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER_1).created,
             <system::Module<Test>>::block_number()
         );
         assert_eq!(
-            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER).renewed,
+            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER_1).renewed,
             <system::Module<Test>>::block_number()
         );
+
+        assert_eq!(
+            BalancesModule::free_balance(ROOT_MANAGER),
+            MinimumApplicationAmount::get()
+        ); // Took SlotCost
     })
 }
