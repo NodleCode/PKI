@@ -474,6 +474,8 @@ fn finalize_application_if_not_challenged_and_enough_time_elapsed() {
         assert_eq!(<Applications<Test>>::contains_key(CANDIDATE), false);
         assert_eq!(<Challenges<Test>>::contains_key(CANDIDATE), false);
         assert_eq!(<Members<Test>>::contains_key(CANDIDATE), true);
+
+        assert_eq!(BalancesModule::usable_balance(CANDIDATE), MinimumApplicationAmount::get());
     })
 }
 

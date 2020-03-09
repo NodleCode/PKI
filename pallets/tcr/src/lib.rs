@@ -306,6 +306,7 @@ impl<T: Trait> Module<T> {
                 <Applications<T>>::remove(account_id.clone());
                 <Members<T>>::insert(account_id.clone(), application.clone());
 
+                Self::unreserve_for(account_id.clone(), application.clone().candidate_deposit)?;
                 new_members.push(account_id.clone());
 
                 Self::deposit_event(RawEvent::ApplicationPassed(account_id));
