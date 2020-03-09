@@ -448,3 +448,24 @@ fn child_certificate_is_valid() {
         );
     })
 }
+
+#[test]
+fn child_invalid_if_equal_root() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        assert_eq!(
+            TestModule::is_child_certificate_valid(
+                &OFFCHAIN_CERTIFICATE_SIGNER_1,
+                &OFFCHAIN_CERTIFICATE_SIGNER_1
+            ),
+            false
+        );
+    })
+}

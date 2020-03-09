@@ -142,12 +142,13 @@ impl<T: Trait> Module<T> {
     }
 
     fn is_child_certificate_valid(root: &T::CertificateId, child: &T::CertificateId) -> bool {
+        let equals = root == child;
         let root_valid = Self::is_root_certificate_valid(root);
         let revoked = <Slots<T>>::get(root).child_revocations.contains(child);
 
         // TODO: let's support signature verification here
 
-        root_valid && !revoked
+        !equals && root_valid && !revoked
     }
 }
 
