@@ -14,9 +14,9 @@ use frame_support::{
     ensure,
     traits::{ChangeMembers, Currency, Get, Imbalance, ReservableCurrency},
 };
+use frame_system::{self as system, ensure_signed};
 use sp_runtime::{traits::CheckedAdd, Perbill};
 use sp_std::prelude::Vec;
-use system::ensure_signed;
 
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 type NegativeImbalanceOf<T> =
