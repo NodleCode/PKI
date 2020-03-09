@@ -35,6 +35,9 @@ pub struct RootCertificate<AccountId, CertificateId, BlockNumber> {
     key: CertificateId,
     created: BlockNumber,
     renewed: BlockNumber,
+    revoked: bool,
+    validity: BlockNumber,
+    child_revocations: Vec<CertificateId>,
 }
 
 /// The module's configuration trait.
@@ -54,6 +57,8 @@ pub trait Trait: system::Trait {
         + Default;
     /// How much a new root certificate costs
     type SlotCost: Get<BalanceOf<Self>>;
+    /// How long a certificate is considered valid
+    type SlotValidity: Get<Self::BlockNumber>;
     /// The module receiving funds paid by depositors, typically a company
     /// reserve
     type FundsCollector: OnUnbalanced<NegativeImbalanceOf<Self>>;
@@ -110,6 +115,9 @@ decl_module! {
                 key: certificate_id.clone(),
                 created: now,
                 renewed: now,
+                revoked: false,
+                validity: T::SlotValidity::get(),
+                child_revocations: vec![],
             });
 
             Self::deposit_event(RawEvent::SlotTaken(sender, certificate_id));
@@ -121,6 +129,25 @@ decl_module! {
 impl<T: Trait> Module<T> {
     fn is_member(who: &T::AccountId) -> bool {
         Self::members().contains(who)
+    }
+
+    fn is_root_certificate_valid(cert: &T::CertificateId) -> bool {
+        let exists = <Slots<T>>::contains_key(cert);
+        let slot = <Slots<T>>::get(cert);
+        let owner_is_member = Self::is_member(&slot.owner);
+        let revoked = slot.revoked;
+        let expired = slot.renewed + slot.validity <= <system::Module<T>>::block_number();
+
+        exists && owner_is_member && !revoked && !expired
+    }
+
+    fn is_child_certificate_valid(root: &T::CertificateId, child: &T::CertificateId) -> bool {
+        let root_valid = Self::is_root_certificate_valid(root);
+        let revoked = <Slots<T>>::get(root).child_revocations.contains(child);
+
+        // TODO: let's support signature verification here
+
+        root_valid && !revoked
     }
 }
 

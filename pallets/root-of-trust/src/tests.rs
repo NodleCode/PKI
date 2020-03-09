@@ -78,12 +78,14 @@ impl pallet_tcr::Trait for Test {
 }
 parameter_types! {
     pub const SlotCost: u64 = 1000;
+    pub const SlotValidity: u64 = 100000;
 }
 impl Trait for Test {
     type Event = ();
     type Currency = pallet_balances::Module<Self>;
     type CertificateId = <Test as system::Trait>::AccountId;
     type SlotCost = SlotCost;
+    type SlotValidity = SlotValidity;
     type FundsCollector = ();
 }
 
@@ -97,6 +99,7 @@ type TestModule = Module<Test>;
 const ROOT_MANAGER: u64 = 1;
 const OFFCHAIN_CERTIFICATE_SIGNER_1: u64 = 2;
 const OFFCHAIN_CERTIFICATE_SIGNER_2: u64 = 3;
+const OFFCHAIN_CERTIFICATE_SIGNER_3: u64 = 4;
 
 // This function basically just builds a genesis storage key/value store according to
 // our desired mockup.
@@ -208,10 +211,240 @@ fn member_can_buy_slots() {
             TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER_1).renewed,
             <system::Module<Test>>::block_number()
         );
+        assert_eq!(
+            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER_1).revoked,
+            false
+        );
+        assert_eq!(
+            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER_1).validity,
+            SlotValidity::get(),
+        );
+        assert_eq!(
+            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER_1).child_revocations,
+            vec![],
+        );
 
         assert_eq!(
             BalancesModule::free_balance(ROOT_MANAGER),
             MinimumApplicationAmount::get()
         ); // Took SlotCost
+    })
+}
+
+#[test]
+fn root_certificate_is_valid() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        assert_eq!(
+            TestModule::is_root_certificate_valid(&OFFCHAIN_CERTIFICATE_SIGNER_1),
+            true
+        );
+    })
+}
+
+#[test]
+fn root_certificate_not_valid_if_revoked() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        let now = <system::Module<Test>>::block_number();
+        <Slots<Test>>::insert(
+            &OFFCHAIN_CERTIFICATE_SIGNER_1,
+            RootCertificate {
+                owner: ROOT_MANAGER,
+                key: OFFCHAIN_CERTIFICATE_SIGNER_1,
+                created: now,
+                renewed: now,
+                revoked: true,
+                validity: SlotValidity::get(),
+                child_revocations: vec![],
+            },
+        );
+
+        assert_eq!(
+            TestModule::is_root_certificate_valid(&OFFCHAIN_CERTIFICATE_SIGNER_1),
+            false
+        );
+    })
+}
+
+#[test]
+fn root_certificate_not_valid_if_expired() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        <system::Module<Test>>::set_block_number(SlotValidity::get() + 1);
+
+        assert_eq!(
+            TestModule::is_root_certificate_valid(&OFFCHAIN_CERTIFICATE_SIGNER_1),
+            false
+        );
+    })
+}
+
+#[test]
+fn root_certificate_not_valid_if_owner_is_no_longer_a_member() {
+    new_test_ext().execute_with(|| {
+        let now = <system::Module<Test>>::block_number();
+        <Slots<Test>>::insert(
+            &OFFCHAIN_CERTIFICATE_SIGNER_1,
+            RootCertificate {
+                owner: ROOT_MANAGER,
+                key: OFFCHAIN_CERTIFICATE_SIGNER_1,
+                created: now,
+                renewed: now,
+                revoked: false,
+                validity: SlotValidity::get(),
+                child_revocations: vec![],
+            },
+        );
+
+        assert_eq!(
+            TestModule::is_root_certificate_valid(&OFFCHAIN_CERTIFICATE_SIGNER_1),
+            false
+        );
+    })
+}
+
+#[test]
+fn root_certificate_not_valid_if_does_not_exists() {
+    new_test_ext().execute_with(|| {
+        assert_eq!(
+            TestModule::is_root_certificate_valid(&OFFCHAIN_CERTIFICATE_SIGNER_1),
+            false
+        );
+    })
+}
+
+#[test]
+fn child_certificate_still_valid_if_revoked_under_non_parent_certificate() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        let now = <system::Module<Test>>::block_number();
+        <Slots<Test>>::insert(
+            &OFFCHAIN_CERTIFICATE_SIGNER_3,
+            RootCertificate {
+                owner: ROOT_MANAGER,
+                key: OFFCHAIN_CERTIFICATE_SIGNER_3,
+                created: now,
+                renewed: now,
+                revoked: false,
+                validity: SlotValidity::get(),
+                child_revocations: vec![OFFCHAIN_CERTIFICATE_SIGNER_2],
+            },
+        );
+
+        assert_eq!(
+            TestModule::is_root_certificate_valid(&OFFCHAIN_CERTIFICATE_SIGNER_1),
+            true
+        );
+
+        assert_eq!(
+            TestModule::is_root_certificate_valid(&OFFCHAIN_CERTIFICATE_SIGNER_3),
+            true
+        );
+
+        assert_eq!(
+            TestModule::is_child_certificate_valid(
+                &OFFCHAIN_CERTIFICATE_SIGNER_1,
+                &OFFCHAIN_CERTIFICATE_SIGNER_2
+            ),
+            true
+        );
+    })
+}
+
+#[test]
+fn child_certificate_not_valid_if_revoked_in_root_certificate() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        let now = <system::Module<Test>>::block_number();
+        <Slots<Test>>::insert(
+            &OFFCHAIN_CERTIFICATE_SIGNER_1,
+            RootCertificate {
+                owner: ROOT_MANAGER,
+                key: OFFCHAIN_CERTIFICATE_SIGNER_1,
+                created: now,
+                renewed: now,
+                revoked: false,
+                validity: SlotValidity::get(),
+                child_revocations: vec![OFFCHAIN_CERTIFICATE_SIGNER_2],
+            },
+        );
+
+        assert_eq!(
+            TestModule::is_root_certificate_valid(&OFFCHAIN_CERTIFICATE_SIGNER_1),
+            true
+        );
+
+        assert_eq!(
+            TestModule::is_child_certificate_valid(
+                &OFFCHAIN_CERTIFICATE_SIGNER_1,
+                &OFFCHAIN_CERTIFICATE_SIGNER_2
+            ),
+            false
+        );
+    })
+}
+
+#[test]
+fn child_certificate_not_valid_if_root_certificate_not_valid() {
+    new_test_ext().execute_with(|| {
+        assert_eq!(
+            TestModule::is_root_certificate_valid(&OFFCHAIN_CERTIFICATE_SIGNER_1),
+            false
+        );
+
+        assert_eq!(
+            TestModule::is_child_certificate_valid(
+                &OFFCHAIN_CERTIFICATE_SIGNER_1,
+                &OFFCHAIN_CERTIFICATE_SIGNER_2
+            ),
+            false
+        );
+    })
+}
+
+#[test]
+fn child_certificate_is_valid() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        assert_eq!(
+            TestModule::is_child_certificate_valid(
+                &OFFCHAIN_CERTIFICATE_SIGNER_1,
+                &OFFCHAIN_CERTIFICATE_SIGNER_2
+            ),
+            true
+        );
     })
 }
