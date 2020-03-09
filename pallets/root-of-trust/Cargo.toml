@@ -1,0 +1,67 @@
+[package]
+name = "pallet-root-of-trust"
+version = "2.0.0"
+authors = ['Eliott Teissonniere <git.eliott@teissonniere.org>']
+edition = "2018"
+readme = "README.md"
+license-file = "LICENSE"
+repository = "https://github.com/NodleCode/pallet-tcr"
+description = "This pallet implements a distributed Root Of Trust for Certification Authorities"
+
+[features]
+default = ['std']
+std = [
+    'serde',
+    'codec/std',
+    'frame-support/std',
+    'frame-system/std',
+    'pallet-balances/std',
+    'sp-runtime/std',
+    'sp-io/std',
+    'sp-std/std',
+    
+    'pallet-tcr/std',
+]
+
+[dependencies.serde]
+features = ['derive']
+optional = true
+version = '1.0.101'
+
+[dependencies.codec]
+default-features = false
+features = ['derive']
+package = 'parity-scale-codec'
+version = '1.0.0'
+
+[dependencies.frame-support]
+default-features = false
+version = '2.0.0-alpha.3'
+
+[dependencies.frame-system]
+default-features = false
+version = '2.0.0-alpha.3'
+
+[dev-dependencies.pallet-balances]
+default-features = false
+version = '2.0.0-alpha.3'
+
+[dev-dependencies.sp-core]
+default-features = false
+version = '2.0.0-alpha.3'
+
+[dependencies.sp-io]
+default-features = false
+version = '2.0.0-alpha.3'
+
+[dependencies.sp-runtime]
+default-features = false
+version = '2.0.0-alpha.3'
+
+[dependencies.sp-std]
+default-features = false
+version = '2.0.0-alpha.3'
+
+[dependencies.pallet-tcr]
+default-features = false
+path = "../tcr"
