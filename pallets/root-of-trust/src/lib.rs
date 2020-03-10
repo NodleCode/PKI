@@ -75,7 +75,9 @@ decl_event!(
         /// A new slot has been booked
         SlotTaken(AccountId, CertificateId),
         /// An exisitng slot has been renewed (its validity period was extended)
-        SlotRenewed(AccountId, CertificateId),
+        SlotRenewed(CertificateId),
+        /// A slot has been revoked by its owner
+        SlotRevoked(CertificateId),
     }
 );
 
@@ -145,10 +147,23 @@ decl_module! {
             };
 
             slot.renewed = <system::Module<T>>::block_number();
-
             <Slots<T>>::insert(&certificate, slot);
 
-            Self::deposit_event(RawEvent::SlotRenewed(sender, certificate));
+            Self::deposit_event(RawEvent::SlotRenewed(certificate));
+            Ok(())
+        }
+
+        fn revoke_slot(origin, certificate: T::CertificateId) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+
+            let mut slot = <Slots<T>>::get(&certificate);
+            ensure!(Self::is_slot_valid(&slot), Error::<T>::NoLongerValid);
+            ensure!(slot.owner == sender, Error::<T>::NotTheOwner);
+
+            slot.revoked = true;
+            <Slots<T>>::insert(&certificate, slot);
+
+            Self::deposit_event(RawEvent::SlotRevoked(certificate));
             Ok(())
         }
     }

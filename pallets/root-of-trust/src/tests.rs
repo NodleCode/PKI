@@ -561,3 +561,75 @@ fn can_not_renew_if_not_enough_funds() {
         );
     })
 }
+
+#[test]
+fn revoke_slot_works() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        assert_ok!(TestModule::revoke_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        assert_eq!(
+            TestModule::is_root_certificate_valid(&OFFCHAIN_CERTIFICATE_SIGNER_1),
+            false
+        );
+        assert_eq!(
+            <Slots<Test>>::get(&OFFCHAIN_CERTIFICATE_SIGNER_1).revoked,
+            true
+        );
+    })
+}
+
+#[test]
+fn can_not_revoke_slot_if_not_owner() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        assert_noop!(
+            TestModule::revoke_slot(
+                Origin::signed(OFFCHAIN_CERTIFICATE_SIGNER_1),
+                OFFCHAIN_CERTIFICATE_SIGNER_1
+            ),
+            Error::<Test>::NotTheOwner
+        );
+    })
+}
+
+#[test]
+fn can_not_revoke_slot_if_not_valid_anymore() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        // Best to way to make it invalid would be to revoke it once already!
+        assert_ok!(TestModule::revoke_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        assert_noop!(
+            TestModule::revoke_slot(Origin::signed(ROOT_MANAGER), OFFCHAIN_CERTIFICATE_SIGNER_1),
+            Error::<Test>::NoLongerValid
+        );
+    })
+}
