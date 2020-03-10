@@ -1,6 +1,11 @@
-[workspace]
+[profile.release]
+panic = 'unwind'
 
+[workspace]
 members = [
+	'node',
+	'runtime',
+
 	'pallets/root-of-trust',
 	'pallets/root-of-trust/rpc',
 	'pallets/root-of-trust/rpc/runtime-api',
