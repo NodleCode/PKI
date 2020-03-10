@@ -56,7 +56,9 @@ pub trait Trait: system::Trait {
         + Ord
         + Default;
     /// How much a new root certificate costs
-    type SlotCost: Get<BalanceOf<Self>>;
+    type SlotBookingCost: Get<BalanceOf<Self>>;
+    /// How much renewing a root certificate costs
+    type SlotRenewingCost: Get<BalanceOf<Self>>;
     /// How long a certificate is considered valid
     type SlotValidity: Get<Self::BlockNumber>;
     /// The module receiving funds paid by depositors, typically a company
@@ -72,6 +74,8 @@ decl_event!(
     {
         /// A new slot has been booked
         SlotTaken(AccountId, CertificateId),
+        /// An exisitng slot has been renewed (its validity period was extended)
+        SlotRenewed(AccountId, CertificateId),
     }
 );
 
@@ -83,6 +87,10 @@ decl_error! {
         SlotTaken,
         /// Not enough funds to pay the fee
         NotEnoughFunds,
+        /// Slot is no longer valid
+        NoLongerValid,
+        /// `origin` is not the slot owner
+        NotTheOwner,
     }
 }
 
@@ -104,7 +112,7 @@ decl_module! {
             ensure!(Self::is_member(&sender), Error::<T>::NotAMember);
             ensure!(!<Slots<T>>::contains_key(&certificate_id), Error::<T>::SlotTaken);
 
-            match T::Currency::withdraw(&sender, T::SlotCost::get(), WithdrawReasons::all(), ExistenceRequirement::AllowDeath) {
+            match T::Currency::withdraw(&sender, T::SlotBookingCost::get(), WithdrawReasons::all(), ExistenceRequirement::AllowDeath) {
                 Ok(imbalance) => T::FundsCollector::on_unbalanced(imbalance),
                 Err(_) => Err(Error::<T>::NotEnoughFunds)?,
             };
@@ -123,6 +131,26 @@ decl_module! {
             Self::deposit_event(RawEvent::SlotTaken(sender, certificate_id));
             Ok(())
         }
+
+        fn renew_slot(origin, certificate: T::CertificateId) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+
+            let mut slot = <Slots<T>>::get(&certificate);
+            ensure!(Self::is_slot_valid(&slot), Error::<T>::NoLongerValid);
+            ensure!(slot.owner == sender, Error::<T>::NotTheOwner);
+
+            match T::Currency::withdraw(&sender, T::SlotRenewingCost::get(), WithdrawReasons::all(), ExistenceRequirement::AllowDeath) {
+                Ok(imbalance) => T::FundsCollector::on_unbalanced(imbalance),
+                Err(_) => Err(Error::<T>::NotEnoughFunds)?,
+            };
+
+            slot.renewed = <system::Module<T>>::block_number();
+
+            <Slots<T>>::insert(&certificate, slot);
+
+            Self::deposit_event(RawEvent::SlotRenewed(sender, certificate));
+            Ok(())
+        }
     }
 }
 
@@ -131,14 +159,21 @@ impl<T: Trait> Module<T> {
         Self::members().contains(who)
     }
 
-    fn is_root_certificate_valid(cert: &T::CertificateId) -> bool {
-        let exists = <Slots<T>>::contains_key(cert);
-        let slot = <Slots<T>>::get(cert);
+    fn is_slot_valid(
+        slot: &RootCertificate<T::AccountId, T::CertificateId, T::BlockNumber>,
+    ) -> bool {
         let owner_is_member = Self::is_member(&slot.owner);
         let revoked = slot.revoked;
         let expired = slot.renewed + slot.validity <= <system::Module<T>>::block_number();
 
-        exists && owner_is_member && !revoked && !expired
+        owner_is_member && !revoked && !expired
+    }
+
+    fn is_root_certificate_valid(cert: &T::CertificateId) -> bool {
+        let exists = <Slots<T>>::contains_key(cert);
+        let slot = <Slots<T>>::get(cert);
+
+        exists && Self::is_slot_valid(&slot)
     }
 
     fn is_child_certificate_valid(root: &T::CertificateId, child: &T::CertificateId) -> bool {

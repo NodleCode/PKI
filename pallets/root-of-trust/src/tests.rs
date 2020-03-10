@@ -77,14 +77,16 @@ impl pallet_tcr::Trait for Test {
     type ChangeMembers = TestModule;
 }
 parameter_types! {
-    pub const SlotCost: u64 = 1000;
+    pub const SlotBookingCost: u64 = 1000;
+    pub const SlotRenewingCost: u64 = 10000;
     pub const SlotValidity: u64 = 100000;
 }
 impl Trait for Test {
     type Event = ();
     type Currency = pallet_balances::Module<Self>;
     type CertificateId = <Test as system::Trait>::AccountId;
-    type SlotCost = SlotCost;
+    type SlotBookingCost = SlotBookingCost;
+    type SlotRenewingCost = SlotRenewingCost;
     type SlotValidity = SlotValidity;
     type FundsCollector = ();
 }
@@ -114,7 +116,7 @@ fn allocate_balances() {
     let mut total_imbalance = <PositiveImbalanceOf<Test>>::zero();
     let r_manager = <Test as Trait>::Currency::deposit_creating(
         &ROOT_MANAGER,
-        MinimumApplicationAmount::get() + SlotCost::get(),
+        MinimumApplicationAmount::get() + SlotBookingCost::get() + SlotRenewingCost::get(),
     );
     total_imbalance.subsume(r_manager);
 }
@@ -178,6 +180,9 @@ fn can_not_buy_slot_if_not_enough_funds() {
             Origin::signed(ROOT_MANAGER),
             OFFCHAIN_CERTIFICATE_SIGNER_1
         ));
+
+        BalancesModule::make_free_balance_be(&ROOT_MANAGER, 0);
+
         assert_noop!(
             TestModule::book_slot(Origin::signed(ROOT_MANAGER), OFFCHAIN_CERTIFICATE_SIGNER_2),
             Error::<Test>::NotEnoughFunds
@@ -226,8 +231,8 @@ fn member_can_buy_slots() {
 
         assert_eq!(
             BalancesModule::free_balance(ROOT_MANAGER),
-            MinimumApplicationAmount::get()
-        ); // Took SlotCost
+            MinimumApplicationAmount::get() + SlotRenewingCost::get()
+        ); // Took SlotBookingCost
     })
 }
 
@@ -466,6 +471,93 @@ fn child_invalid_if_equal_root() {
                 &OFFCHAIN_CERTIFICATE_SIGNER_1
             ),
             false
+        );
+    })
+}
+
+#[test]
+fn renew_update_fields() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        assert_ok!(TestModule::renew_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+        assert_eq!(
+            TestModule::slots(OFFCHAIN_CERTIFICATE_SIGNER_1).renewed,
+            <system::Module<Test>>::block_number()
+        );
+        assert_eq!(
+            BalancesModule::free_balance(ROOT_MANAGER),
+            MinimumApplicationAmount::get()
+        ); // Took SlotBookingCost + SlotRenewingCost
+    })
+}
+
+#[test]
+fn can_not_renew_if_not_owner() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        assert_noop!(
+            TestModule::renew_slot(
+                Origin::signed(OFFCHAIN_CERTIFICATE_SIGNER_1),
+                OFFCHAIN_CERTIFICATE_SIGNER_1
+            ),
+            Error::<Test>::NotTheOwner
+        );
+    })
+}
+
+#[test]
+fn can_not_renew_if_invalid() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        <system::Module<Test>>::set_block_number(SlotValidity::get() + 1);
+
+        assert_noop!(
+            TestModule::renew_slot(Origin::signed(ROOT_MANAGER), OFFCHAIN_CERTIFICATE_SIGNER_1),
+            Error::<Test>::NoLongerValid
+        );
+    })
+}
+
+#[test]
+fn can_not_renew_if_not_enough_funds() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        BalancesModule::make_free_balance_be(&ROOT_MANAGER, 0);
+
+        assert_noop!(
+            TestModule::renew_slot(Origin::signed(ROOT_MANAGER), OFFCHAIN_CERTIFICATE_SIGNER_1),
+            Error::<Test>::NotEnoughFunds
         );
     })
 }
