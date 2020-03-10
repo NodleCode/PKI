@@ -1,0 +1,43 @@
+[package]
+name = "pallet-root-of-trust-rpc"
+version = "2.0.0"
+authors = ['Eliott Teissonniere <git.eliott@teissonniere.org>']
+edition = "2018"
+
+[features]
+default = ['std']
+std = [
+  'serde',
+  'sp-runtime/std',
+  'sp-api/std',
+  
+  'pallet-root-of-trust-runtime-api/std'
+]
+
+[dependencies]
+codec = { package = 'parity-scale-codec', version = '1.0.0' }
+jsonrpc-core = '14.0.3'
+jsonrpc-core-client = '14.0.3'
+jsonrpc-derive = '14.0.3'
+serde = { version = '1.0.101', features = ['derive'], optional = true }
+
+[dependencies.sp-api]
+default-features = false
+version = '2.0.0-alpha.3'
+
+[dependencies.sp-blockchain]
+default-features = false
+version = '2.0.0-alpha.3'
+
+[dependencies.sp-rpc]
+default-features = false
+version = '2.0.0-alpha.3'
+
+[dependencies.sp-runtime]
+default-features = false
+version = '2.0.0-alpha.3'
+
+[dependencies.pallet-root-of-trust-runtime-api]
+path = './runtime-api'
+default_features = false
+version = '2.0.0'

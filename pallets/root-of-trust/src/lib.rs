@@ -7,7 +7,7 @@
 #[cfg(test)]
 mod tests;
 
-use codec::{Codec, Decode, Encode};
+use codec::{Decode, Encode};
 use frame_support::{
     decl_error, decl_event, decl_module, decl_storage,
     dispatch::DispatchResult,
@@ -16,7 +16,6 @@ use frame_support::{
     Parameter,
 };
 use frame_system::{self as system, ensure_signed};
-use sp_api::decl_runtime_apis;
 use sp_runtime::traits::{MaybeDisplay, MaybeSerializeDeserialize, Member};
 use sp_std::{fmt::Debug, prelude::Vec};
 
@@ -223,14 +222,5 @@ impl<T: Trait> ChangeMembers<T::AccountId> for Module<T> {
         new: &[T::AccountId],
     ) {
         <Members<T>>::put(new);
-    }
-}
-
-decl_runtime_apis! {
-    pub trait RootOfTrustApi<CertificateId> where
-        CertificateId: Codec
-    {
-        fn is_root_certificate_valid(cert: &CertificateId) -> bool;
-        fn is_child_certificate_valid(root: &CertificateId, child: &CertificateId) -> bool;
     }
 }
