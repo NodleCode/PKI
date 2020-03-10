@@ -78,6 +78,8 @@ decl_event!(
         SlotRenewed(CertificateId),
         /// A slot has been revoked by its owner
         SlotRevoked(CertificateId),
+        /// A child certificate was revoked
+        ChildSlotRevoked(CertificateId, CertificateId),
     }
 );
 
@@ -164,6 +166,21 @@ decl_module! {
             <Slots<T>>::insert(&certificate, slot);
 
             Self::deposit_event(RawEvent::SlotRevoked(certificate));
+            Ok(())
+        }
+
+        fn revoke_child(origin, root: T::CertificateId, child: T::CertificateId) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+
+            let mut slot = <Slots<T>>::get(&root);
+            ensure!(Self::is_slot_valid(&slot), Error::<T>::NoLongerValid);
+            ensure!(slot.owner == sender, Error::<T>::NotTheOwner);
+            ensure!(!slot.child_revocations.contains(&child), Error::<T>::NoLongerValid);
+
+            slot.child_revocations.push(child.clone());
+            <Slots<T>>::insert(&root, slot);
+
+            Self::deposit_event(RawEvent::ChildSlotRevoked(root, child));
             Ok(())
         }
     }

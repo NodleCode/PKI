@@ -586,6 +586,7 @@ fn revoke_slot_works() {
             <Slots<Test>>::get(&OFFCHAIN_CERTIFICATE_SIGNER_1).revoked,
             true
         );
+        assert_eq!(TestModule::is_root_certificate_valid(&ROOT_MANAGER), false);
     })
 }
 
@@ -629,6 +630,120 @@ fn can_not_revoke_slot_if_not_valid_anymore() {
 
         assert_noop!(
             TestModule::revoke_slot(Origin::signed(ROOT_MANAGER), OFFCHAIN_CERTIFICATE_SIGNER_1),
+            Error::<Test>::NoLongerValid
+        );
+    })
+}
+
+#[test]
+fn revoke_child_works() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        assert_ok!(TestModule::revoke_child(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1,
+            OFFCHAIN_CERTIFICATE_SIGNER_2
+        ));
+
+        assert_eq!(
+            TestModule::is_root_certificate_valid(&OFFCHAIN_CERTIFICATE_SIGNER_1),
+            true
+        );
+        assert_eq!(
+            TestModule::is_child_certificate_valid(
+                &OFFCHAIN_CERTIFICATE_SIGNER_1,
+                &OFFCHAIN_CERTIFICATE_SIGNER_2
+            ),
+            false
+        );
+        assert_eq!(
+            <Slots<Test>>::get(&OFFCHAIN_CERTIFICATE_SIGNER_1)
+                .child_revocations
+                .contains(&OFFCHAIN_CERTIFICATE_SIGNER_2),
+            true
+        );
+    })
+}
+
+#[test]
+fn can_not_revoke_child_if_not_owner() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        assert_noop!(
+            TestModule::revoke_child(
+                Origin::signed(OFFCHAIN_CERTIFICATE_SIGNER_1),
+                OFFCHAIN_CERTIFICATE_SIGNER_1,
+                OFFCHAIN_CERTIFICATE_SIGNER_2
+            ),
+            Error::<Test>::NotTheOwner
+        );
+    })
+}
+
+#[test]
+fn can_not_revoke_child_if_root_not_valid_anymore() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        assert_ok!(TestModule::revoke_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        assert_noop!(
+            TestModule::revoke_child(
+                Origin::signed(ROOT_MANAGER),
+                OFFCHAIN_CERTIFICATE_SIGNER_1,
+                OFFCHAIN_CERTIFICATE_SIGNER_2
+            ),
+            Error::<Test>::NoLongerValid
+        );
+    })
+}
+
+#[test]
+fn can_not_revoke_child_if_not_valid_anymore() {
+    new_test_ext().execute_with(|| {
+        allocate_balances();
+        do_register();
+
+        assert_ok!(TestModule::book_slot(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1
+        ));
+
+        assert_ok!(TestModule::revoke_child(
+            Origin::signed(ROOT_MANAGER),
+            OFFCHAIN_CERTIFICATE_SIGNER_1,
+            OFFCHAIN_CERTIFICATE_SIGNER_2
+        ));
+
+        assert_noop!(
+            TestModule::revoke_child(
+                Origin::signed(ROOT_MANAGER),
+                OFFCHAIN_CERTIFICATE_SIGNER_1,
+                OFFCHAIN_CERTIFICATE_SIGNER_2
+            ),
             Error::<Test>::NoLongerValid
         );
     })
