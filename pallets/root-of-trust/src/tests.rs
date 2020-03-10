@@ -9,7 +9,6 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
 };
-use std::cell::RefCell;
 
 impl_outer_origin! {
     pub enum Origin for Test {}

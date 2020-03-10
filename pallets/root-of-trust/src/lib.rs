@@ -10,20 +10,14 @@ mod tests;
 use codec::{Codec, Decode, Encode};
 use frame_support::{
     decl_error, decl_event, decl_module, decl_storage,
-    dispatch::{result::Result, DispatchError, DispatchResult},
+    dispatch::DispatchResult,
     ensure,
-    traits::{
-        ChangeMembers, Currency, ExistenceRequirement, Get, Imbalance, OnUnbalanced,
-        WithdrawReasons,
-    },
+    traits::{ChangeMembers, Currency, ExistenceRequirement, Get, OnUnbalanced, WithdrawReasons},
     Parameter,
 };
 use frame_system::{self as system, ensure_signed};
 use sp_api::decl_runtime_apis;
-use sp_runtime::{
-    traits::{CheckedAdd, MaybeDisplay, MaybeSerializeDeserialize, Member},
-    Perbill,
-};
+use sp_runtime::traits::{MaybeDisplay, MaybeSerializeDeserialize, Member};
 use sp_std::{fmt::Debug, prelude::Vec};
 
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
@@ -202,6 +196,7 @@ impl<T: Trait> Module<T> {
         owner_is_member && !revoked && !expired
     }
 
+    #[allow(dead_code)]
     fn is_root_certificate_valid(cert: &T::CertificateId) -> bool {
         let exists = <Slots<T>>::contains_key(cert);
         let slot = <Slots<T>>::get(cert);
@@ -209,6 +204,7 @@ impl<T: Trait> Module<T> {
         exists && Self::is_slot_valid(&slot)
     }
 
+    #[allow(dead_code)]
     fn is_child_certificate_valid(root: &T::CertificateId, child: &T::CertificateId) -> bool {
         let equals = root == child;
         let root_valid = Self::is_root_certificate_valid(root);
