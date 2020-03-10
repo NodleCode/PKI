@@ -140,9 +140,9 @@ decl_module! {
                 challenger_deposit: None,
 
                 votes_for: None,
-                voters_for: vec![],
+                voters_for: Vec::new(),
                 votes_against: None,
-                voters_against: vec![],
+                voters_against: Vec::new(),
 
                 created_block: <system::Module<T>>::block_number(),
                 challenged_block: 0.into(),
@@ -207,9 +207,9 @@ decl_module! {
             application.challenger_deposit = Some(deposit);
             application.challenged_block = <system::Module<T>>::block_number();
             application.votes_for = None;
-            application.voters_for = vec![];
+            application.voters_for = Vec::new();
             application.votes_against = None;
-            application.voters_against = vec![];
+            application.voters_against = Vec::new();
 
             <Challenges<T>>::insert(member.clone(), application);
 
@@ -219,8 +219,8 @@ decl_module! {
 
         /// At the end of each blocks, commit applications or challenges as needed
         fn on_finalize(block: T::BlockNumber) {
-            let (mut new_1, mut old_1) = Self::commit_applications(block).unwrap_or((vec![], vec![]));
-            let (new_2, old_2) = Self::resolve_challenges(block).unwrap_or((vec![], vec![]));
+            let (mut new_1, mut old_1) = Self::commit_applications(block).unwrap_or((Vec::new(), Vec::new()));
+            let (new_2, old_2) = Self::resolve_challenges(block).unwrap_or((Vec::new(), Vec::new()));
 
             // TODO: optimise all those array operations
 
@@ -296,7 +296,7 @@ impl<T: Trait> Module<T> {
     fn commit_applications(
         block: T::BlockNumber,
     ) -> Result<(Vec<T::AccountId>, Vec<T::AccountId>), DispatchError> {
-        let mut new_members = vec![];
+        let mut new_members = Vec::new();
 
         for (account_id, application) in <Applications<T>>::enumerate() {
             if block - application.clone().created_block >= T::FinalizeApplicationPeriod::get() {
@@ -313,14 +313,14 @@ impl<T: Trait> Module<T> {
             }
         }
 
-        Ok((new_members, vec![]))
+        Ok((new_members, Vec::new()))
     }
 
     fn resolve_challenges(
         block: T::BlockNumber,
     ) -> Result<(Vec<T::AccountId>, Vec<T::AccountId>), DispatchError> {
-        let mut new_members = vec![];
-        let mut old_members = vec![];
+        let mut new_members = Vec::new();
+        let mut old_members = Vec::new();
 
         for (account_id, application) in <Challenges<T>>::enumerate() {
             if block - application.clone().challenged_block >= T::FinalizeChallengePeriod::get() {

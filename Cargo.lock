@@ -3223,6 +3223,7 @@ dependencies = [
  "pallet-grandpa",
  "pallet-randomness-collective-flip",
  "pallet-sudo",
+ "pallet-tcr",
  "pallet-timestamp",
  "pallet-transaction-payment",
  "parity-scale-codec",

@@ -90,7 +90,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("nodle-pki"),
     impl_name: create_runtime_str!("nodle-pki"),
     authoring_version: 1,
-    spec_version: 1,
+    spec_version: 2,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
 };
@@ -216,6 +216,27 @@ impl sudo::Trait for Runtime {
     type Call = Call;
 }
 
+parameter_types! {
+    pub const MinimumApplicationAmount: Balance = 100_000;
+    pub const MinimumCounterAmount: Balance = 1_000_000;
+    pub const MinimumChallengeAmount: Balance = 10_000_000;
+    pub const FinalizeApplicationPeriod: BlockNumber = 100;
+    pub const FinalizeChallengePeriod: BlockNumber = 1000;
+    pub const LoosersSlash: Perbill = Perbill::from_percent(25); // Take 1/4 of the betted tokens
+}
+
+impl pallet_tcr::Trait for Runtime {
+    type Event = Event;
+    type Currency = balances::Module<Runtime>;
+    type MinimumApplicationAmount = MinimumApplicationAmount;
+    type MinimumCounterAmount = MinimumCounterAmount;
+    type MinimumChallengeAmount = MinimumChallengeAmount;
+    type FinalizeApplicationPeriod = FinalizeApplicationPeriod;
+    type FinalizeChallengePeriod = FinalizeChallengePeriod;
+    type LoosersSlash = LoosersSlash;
+    type ChangeMembers = ();
+}
+
 construct_runtime!(
     pub enum Runtime where
         Block = Block,
@@ -230,6 +251,8 @@ construct_runtime!(
         Balances: balances::{Module, Call, Storage, Config<T>, Event<T>},
         TransactionPayment: transaction_payment::{Module, Storage},
         Sudo: sudo::{Module, Call, Config<T>, Storage, Event<T>},
+
+        Tcr: pallet_tcr::{Module, Call, Storage, Event<T>},
     }
 );
 

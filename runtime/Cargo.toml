@@ -25,6 +25,8 @@ std = [
     'system/std',
     'timestamp/std',
     'transaction-payment/std',
+
+    'pallet-tcr/std',
 ]
 
 [package]
@@ -34,6 +36,10 @@ version = "2.0.0"
 authors = ['Eliott Teissonniere <git.eliott@teissonniere.org>']
 edition = "2018"
 repository = "https://github.com/NodleCode/pki"
+
+[dependencies.pallet-tcr]
+default-features = false
+path = '../pallets/tcr'
 
 [dependencies.aura]
 default-features = false
