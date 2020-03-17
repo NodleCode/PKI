@@ -27,6 +27,8 @@ std = [
     'transaction-payment/std',
 
     'pallet-tcr/std',
+    'pallet-root-of-trust/std',
+    'pallet-root-of-trust-runtime-api/std',
 ]
 
 [package]
@@ -40,6 +42,14 @@ repository = "https://github.com/NodleCode/pki"
 [dependencies.pallet-tcr]
 default-features = false
 path = '../pallets/tcr'
+
+[dependencies.pallet-root-of-trust]
+default-features = false
+path = '../pallets/root-of-trust'
+
+[dependencies.pallet-root-of-trust-runtime-api]
+default-features = false
+path = '../pallets/root-of-trust/rpc/runtime-api'
 
 [dependencies.aura]
 default-features = false
@@ -55,7 +65,7 @@ version = '2.0.0-alpha.3'
 default-features = false
 features = ['derive']
 package = 'parity-scale-codec'
-version = '1.2.0'
+version = '1.0.0'
 
 [dependencies.frame-executive]
 default-features = false

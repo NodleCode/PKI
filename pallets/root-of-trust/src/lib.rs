@@ -123,7 +123,7 @@ decl_module! {
                 renewed: now,
                 revoked: false,
                 validity: T::SlotValidity::get(),
-                child_revocations: vec![],
+                child_revocations: Vec::new(),
             });
 
             Self::deposit_event(RawEvent::SlotTaken(sender, certificate_id));
@@ -196,7 +196,7 @@ impl<T: Trait> Module<T> {
     }
 
     #[allow(dead_code)]
-    fn is_root_certificate_valid(cert: &T::CertificateId) -> bool {
+    pub fn is_root_certificate_valid(cert: &T::CertificateId) -> bool {
         let exists = <Slots<T>>::contains_key(cert);
         let slot = <Slots<T>>::get(cert);
 
@@ -204,7 +204,7 @@ impl<T: Trait> Module<T> {
     }
 
     #[allow(dead_code)]
-    fn is_child_certificate_valid(root: &T::CertificateId, child: &T::CertificateId) -> bool {
+    pub fn is_child_certificate_valid(root: &T::CertificateId, child: &T::CertificateId) -> bool {
         let equals = root == child;
         let root_valid = Self::is_root_certificate_valid(root);
         let revoked = <Slots<T>>::get(root).child_revocations.contains(child);

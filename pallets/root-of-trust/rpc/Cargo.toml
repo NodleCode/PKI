@@ -7,6 +7,7 @@ edition = "2018"
 [features]
 default = ['std']
 std = [
+  'codec/std',
   'serde',
   'sp-runtime/std',
   'sp-api/std',
@@ -26,10 +27,6 @@ default-features = false
 version = '2.0.0-alpha.3'
 
 [dependencies.sp-blockchain]
-default-features = false
-version = '2.0.0-alpha.3'
-
-[dependencies.sp-rpc]
 default-features = false
 version = '2.0.0-alpha.3'
 

@@ -90,7 +90,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
     spec_name: create_runtime_str!("nodle-pki"),
     impl_name: create_runtime_str!("nodle-pki"),
     authoring_version: 1,
-    spec_version: 2,
+    spec_version: 3,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
 };
@@ -234,7 +234,26 @@ impl pallet_tcr::Trait for Runtime {
     type FinalizeApplicationPeriod = FinalizeApplicationPeriod;
     type FinalizeChallengePeriod = FinalizeChallengePeriod;
     type LoosersSlash = LoosersSlash;
-    type ChangeMembers = ();
+    type ChangeMembers = pallet_root_of_trust::Module<Runtime>;
+}
+
+parameter_types! {
+    pub const SlotBookingCost: Balance = 100;
+    pub const SlotRenewingCost: Balance = 100;
+    pub const SlotValidity: BlockNumber = 1_000_000_000;
+}
+
+impl pallet_root_of_trust::Trait for Runtime {
+    type Event = Event;
+    type Currency = balances::Module<Runtime>;
+    type CertificateId = AccountId;
+    type SlotBookingCost = SlotBookingCost;
+    type SlotRenewingCost = SlotRenewingCost;
+    type SlotValidity = SlotValidity;
+
+    // In this simple example we burn the funds, in production the best would
+    // be to give this to a `treasury` like module.
+    type FundsCollector = ();
 }
 
 construct_runtime!(
@@ -253,6 +272,7 @@ construct_runtime!(
         Sudo: sudo::{Module, Call, Config<T>, Storage, Event<T>},
 
         Tcr: pallet_tcr::{Module, Call, Storage, Event<T>},
+        RootOfTrust: pallet_root_of_trust::{Module, Call, Storage, Event<T>},
     }
 );
 
@@ -370,6 +390,16 @@ impl_runtime_apis! {
     impl fg_primitives::GrandpaApi<Block> for Runtime {
         fn grandpa_authorities() -> GrandpaAuthorityList {
             Grandpa::grandpa_authorities()
+        }
+    }
+
+    impl pallet_root_of_trust_runtime_api::RootOfTrustApi<Block, AccountId> for Runtime {
+        fn is_root_certificate_valid(cert: &AccountId) -> bool {
+            RootOfTrust::is_root_certificate_valid(cert)
+        }
+
+        fn is_child_certificate_valid(root: &AccountId, child: &AccountId) -> bool {
+            RootOfTrust::is_child_certificate_valid(root, child)
         }
     }
 }
