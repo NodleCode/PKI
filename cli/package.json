@@ -1,0 +1,10 @@
+{
+  "name": "pki-cli",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Eliott Teissonniere",
+  "license": "BSD-3-Clause-Clear",
+  "dependencies": {
+    "yargs": "^15.3.1"
+  }
+}
