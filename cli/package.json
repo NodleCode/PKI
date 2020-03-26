@@ -5,6 +5,7 @@
   "author": "Eliott Teissonniere",
   "license": "BSD-3-Clause-Clear",
   "dependencies": {
+    "@polkadot/api": "^1.8.1",
     "yargs": "^15.3.1"
   }
 }
