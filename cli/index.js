@@ -39,6 +39,9 @@ require('yargs')
 			console.log(`Signer ......... : ${status.signingAddress}`);
 			console.log(`Owner .......... : ${status.ownerAddress}`);
 			console.log(`Validity ....... : ${status.valid}`);
+
+			// Yargs doesn't play nice with promises, force exit
+			process.exit(0);
 		},
 	)
 	.command(
