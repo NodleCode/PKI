@@ -6,6 +6,7 @@ const { randomAsU8a } = require('@polkadot/util-crypto');
 const moment = require('moment');
 
 const Certificate = require('./certificate');
+const Runtime = require('./runtime');
 
 require('yargs')
 	.usage('Usage: $0 [--seed <seed>] <command> [options]')
@@ -30,7 +31,15 @@ require('yargs')
 			describe: 'the registered on-chain public signing key',
 			type: 'string'
 		}),
-		console.log,
+		async (argv) => {
+			const runtime = new Runtime(argv.wsRpc);
+			await runtime.connect();
+			const status = await runtime.slotStatus(argv.signingAddress);
+
+			console.log(`Signer ......... : ${status.signingAddress}`);
+			console.log(`Owner .......... : ${status.ownerAddress}`);
+			console.log(`Validity ....... : ${status.valid}`);
+		},
 	)
 	.command(
 		'certify <deviceKey>',
