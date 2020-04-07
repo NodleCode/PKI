@@ -3,6 +3,9 @@
 const { Keyring } = require('@polkadot/api');
 const { u8aToHex } = require('@polkadot/util');
 const { randomAsU8a } = require('@polkadot/util-crypto');
+const moment = require('moment');
+
+const Certificate = require('./certificate');
 
 require('yargs')
 	.usage('Usage: $0 [--seed <seed>] <command> [options]')
@@ -35,8 +38,29 @@ require('yargs')
 		(b) => b.positional('deviceKey', {
 			describe: 'the public key of the device to certify',
 			type: 'string'
+		}).positional('expiry', {
+			describe: 'specify in how much time the certificate expires',
+			type: 'string',
+			default: '1 month'
 		}),
-		console.log,
+		(argv) => {
+			const splitted = argv.expiry.split(" ");
+			const amount = parseInt(splitted[0]);
+			const unit = splitted[1];
+
+			const keyring = new Keyring({ type: 'ed25519' });
+			const pair = keyring.addFromUri(argv.seed);
+
+			const certificate = new Certificate({ device: argv.deviceKey, pair: pair, expiry: moment().add(amount, unit) });
+			const encoded = certificate.signAndEncode();
+
+			console.log(`Device ......... : ${certificate.deviceAddress}`);
+			console.log(`Signer ......... : ${certificate.signerAddress}`);
+			console.log(`Creation date .. : ${certificate.creationDate.format()}`);
+			console.log(`Expiry date .... : ${certificate.expirationDate.format()}`);
+			console.log('------------------')
+			console.log(encoded);
+		},
 	)
 	.command(
 		'verify <certificate>',
