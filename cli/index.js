@@ -54,7 +54,7 @@ require('yargs')
 			const certificate = new Certificate({ device: argv.deviceKey, pair: pair, expiry: moment().add(amount, unit) });
 			const encoded = certificate.signAndEncode();
 
-			console.log(`Device ......... : ${certificate.deviceAddress}`);
+			console.log(`Device ......... : ${certificate.devicePublicKey}`);
 			console.log(`Signer ......... : ${certificate.signerAddress}`);
 			console.log(`Creation date .. : ${certificate.creationDate.format()}`);
 			console.log(`Expiry date .... : ${certificate.expirationDate.format()}`);
