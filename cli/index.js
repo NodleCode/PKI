@@ -155,7 +155,15 @@ require('yargs')
 			describe: 'the public key of the device',
 			type: 'string'
 		}),
-		console.log,
+		async (argv) => {
+			const runtime = new Runtime(argv.wsRpc);
+			await runtime.connect();
+			runtime.setSigner(argv.seed);
+
+			console.log(`Submitted transaction ${await runtime.revokeChild(argv.signingAddress, argv.deviceAddress)}`);
+
+			process.exit(0);
+		},
 	)
 	.describe('seed', 'Specify a seed used to sign transactions')
 	.describe('ws-rpc', 'Specify the node WS RPC endpoint, default to localhost')

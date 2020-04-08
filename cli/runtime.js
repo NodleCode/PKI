@@ -98,6 +98,12 @@ class Runtime {
 			.revokeSlot(slotAddress)
 			.signAndSend(this.signer)		
 	}
+
+	async revokeChild(root, child) {
+		return await this.api.tx.rootOfTrust
+			.revokeChild(root, child)
+			.signAndSend(this.signer)		
+	}
 }
 
 module.exports = Runtime;
