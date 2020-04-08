@@ -20,6 +20,9 @@ name = 'pki-node'
 futures = '0.3.1'
 log = '0.4.8'
 structopt = '0.3.8'
+jsonrpc-core = '14.0.3'
+jsonrpc-core-client = '14.0.3'
+jsonrpc-derive = '14.0.3'
 
 [dependencies.grandpa]
 package = 'sc-finality-grandpa'
@@ -28,6 +31,9 @@ version = '0.8.0-alpha.3'
 [dependencies.grandpa-primitives]
 package = 'sp-finality-grandpa'
 version = '2.0.0-alpha.3'
+
+[dependencies.pallet-root-of-trust-rpc]
+path = '../pallets/root-of-trust/rpc'
 
 [dependencies.pki-runtime]
 path = '../runtime'
@@ -53,6 +59,9 @@ version = '0.8.0-alpha.3'
 
 [dependencies.sc-network]
 version = '0.8.0-alpha.3'
+
+[dependencies.sc-rpc]
+version = '2.0.0-alpha.3'
 
 [dependencies.sc-service]
 version = '0.8.0-alpha.3'
