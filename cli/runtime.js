@@ -86,6 +86,12 @@ class Runtime {
 			.bookSlot(slotAddress)
 			.signAndSend(this.signer)		
 	}
+
+	async renewSlot(slotAddress) {
+		return await this.api.tx.rootOfTrust
+			.renewSlot(slotAddress)
+			.signAndSend(this.signer)		
+	}
 }
 
 module.exports = Runtime;
