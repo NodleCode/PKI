@@ -81,7 +81,18 @@ require('yargs')
 			describe: 'the certificate to verify',
 			type: 'string'
 		}),
-		console.log,
+		async (argv) => {
+			const runtime = new Runtime(argv.wsRpc);
+			await runtime.connect();
+
+			if (await Certificate.verify(argv.certificate, runtime)) {
+				console.log('Certificate is valid');
+			} else {
+				console.log('Certificate is NOT valid');
+			}
+
+			process.exit(0);
+		},
 	)
 	.command(
 		'book <signingAddress>',
