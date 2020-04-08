@@ -34,8 +34,22 @@ class Runtime {
 						description: "Verify if a root certificate is valid",
 						params: [{
 							name: "cert",
-							type: "CertificateId",
+							type: "CertificateId"
 						}],
+						type: "bool"
+					},
+					isChildCertificateValid: {
+						description: "Verify if a child and root certificates are valid",
+						params: [
+							{
+								name: "root",
+								type: "CertificateId"
+							},
+							{
+								name: "child",
+								type: "CertificateId"
+							}
+						],
 						type: "bool"
 					}
 				}
@@ -52,6 +66,10 @@ class Runtime {
 			ownerAddress: slot.owner,
 			valid: isValid
 		}
+	}
+
+	async root_and_child_valid(root, child) {
+		return await this.api.rpc.rootOfTrust.isChildCertificateValid(root, child)
 	}
 }
 

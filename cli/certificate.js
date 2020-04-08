@@ -4,14 +4,14 @@ const blake = require('blakejs')
 const moment = require('moment');
 
 class Certificate {
-	devicePublicKey = '';
+	deviceAddress = '';
 	signerAddress = '';
 	signerKeypair = null;
 	creationDate = null;
 	expirationDate = null;
 
 	constructor(description) {
-		this.devicePublicKey = description.device;
+		this.deviceAddress = description.device;
 		this.signerKeypair = description.pair;
 		this.signerAddress = description.pair.address;
 		this.creationDate = moment();
@@ -20,13 +20,13 @@ class Certificate {
 
 	sign() {
 		const rawMessage = {
-			devicePublicKey: this.devicePublicKey,
+			deviceAddress: this.deviceAddress,
 			signerAddress: this.signerAddress,
 			creationDate: this.creationDate.unix(),
 			expirationDate: this.expirationDate.unix()
 		};
 
-		const u8aMessage = u8aToU8a(rawMessage.devicePublicKey)
+		const u8aMessage = u8aToU8a(rawMessage.deviceAddress)
 			+ this.signerKeypair.publicKey
 			+ new Uint8Array([rawMessage.creationDate])
 			+ new Uint8Array([rawMessage.expirationDate]);
@@ -47,7 +47,7 @@ class Certificate {
 		return Buffer.from(JSON.stringify(signed)).toString('base64')
 	}
 
-	static verify(encodedCertificate, runtime) {
+	static async verify(encodedCertificate, runtime) {
 		const buff = Buffer.from(encodedCertificate, 'base64');
 		const json = buff.toString('ascii');
 		const decoded = JSON.parse(json);
@@ -65,7 +65,7 @@ class Certificate {
 		const keyring = new Keyring({ type: 'ed25519' });
 		const signerPair = keyring.addFromAddress(decoded.payload.signerAddress);
 
-		const u8aMessage = u8aToU8a(decoded.payload.devicePublicKey)
+		const u8aMessage = u8aToU8a(decoded.payload.deviceAddress)
 			+ signerPair.publicKey
 			+ new Uint8Array([decoded.payload.creationDate])
 			+ new Uint8Array([decoded.payload.expirationDate]);
@@ -83,7 +83,12 @@ class Certificate {
 			return false
 		}
 
-		console.log("still need to query the node");
+		const chainStateOk = await runtime.root_and_child_valid(decoded.payload.signerAddress, decoded.payload.deviceAddress);
+		if (!chainStateOk) {
+			console.log('Root / Child not valid or revoked');
+			return false
+		}
+
 		return true
 	}
 }

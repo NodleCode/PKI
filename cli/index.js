@@ -45,10 +45,10 @@ require('yargs')
 		},
 	)
 	.command(
-		'certify <deviceKey>',
+		'certify <deviceAddress>',
 		'Forge a new certificate and sign it',
-		(b) => b.positional('deviceKey', {
-			describe: 'the public key of the device to certify',
+		(b) => b.positional('deviceAddress', {
+			describe: 'the address of the device to certify',
 			type: 'string'
 		}).positional('expiry', {
 			describe: 'specify in how much time the certificate expires',
@@ -63,10 +63,10 @@ require('yargs')
 			const keyring = new Keyring({ type: 'ed25519' });
 			const pair = keyring.addFromUri(argv.seed);
 
-			const certificate = new Certificate({ device: argv.deviceKey, pair: pair, expiry: moment().add(amount, unit) });
+			const certificate = new Certificate({ device: argv.deviceAddress, pair: pair, expiry: moment().add(amount, unit) });
 			const encoded = certificate.signAndEncode();
 
-			console.log(`Device ......... : ${certificate.devicePublicKey}`);
+			console.log(`Device ......... : ${certificate.deviceAddress}`);
 			console.log(`Signer ......... : ${certificate.signerAddress}`);
 			console.log(`Creation date .. : ${certificate.creationDate.format()}`);
 			console.log(`Expiry date .... : ${certificate.expirationDate.format()}`);
