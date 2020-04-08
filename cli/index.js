@@ -101,7 +101,15 @@ require('yargs')
 			describe: 'the to-be-registered on-chain public signing key',
 			type: 'string'
 		}),
-		console.log,
+		async (argv) => {
+			const runtime = new Runtime(argv.wsRpc);
+			await runtime.connect();
+			runtime.setSigner(argv.seed);
+
+			console.log(`Submitted transaction ${await runtime.bookSlot(argv.signingAddress)}`);
+
+			process.exit(0);
+		},
 	)
 	.command(
 		'renew <signingAddress>',

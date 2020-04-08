@@ -1,8 +1,11 @@
 const { ApiPromise, WsProvider } = require('@polkadot/api');
+const { Keyring } = require('@polkadot/api');
 
 class Runtime {
 	api = null;
 	provider = null;
+	keyring = null;
+	signer = null;
 
 	constructor(wsRpcUrl) {
 		if (wsRpcUrl == undefined || wsRpcUrl == null || wsRpcUrl == "") {
@@ -10,6 +13,8 @@ class Runtime {
 		}
 
 		this.provider = new WsProvider(wsRpcUrl);
+
+		this.keyring = new Keyring({ type: 'sr25519' });
 	}
 
 	async connect() {
@@ -70,6 +75,16 @@ class Runtime {
 
 	async rootAndChildValid(root, child) {
 		return await this.api.rpc.rootOfTrust.isChildCertificateValid(root, child)
+	}
+
+	setSigner(seed) {
+		this.signer = this.keyring.addFromUri(seed);
+	}
+
+	async bookSlot(slotAddress) {
+		return await this.api.tx.rootOfTrust
+			.bookSlot(slotAddress)
+			.signAndSend(this.signer)		
 	}
 }
 
