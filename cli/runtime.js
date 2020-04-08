@@ -27,13 +27,25 @@ class Runtime {
 					validity: "BlockNumber",
 					child_revocations: "Vec<CertificateId>"
 				}
+			},
+			rpc: {
+				rootOfTrust: {
+					isRootCertificateValid: {
+						description: "Verify if a root certificate is valid",
+						params: [{
+							name: "cert",
+							type: "CertificateId",
+						}],
+						type: "bool"
+					}
+				}
 			}
 		})
 	}
 
 	async slotStatus(signerAddress) {
 		const slot = await this.api.query.rootOfTrust.slots(signerAddress);
-		const isValid = "not yet implemented"
+		const isValid = await this.api.rpc.rootOfTrust.isRootCertificateValid(signerAddress);
 		
 		return {
 			signingAddress: slot.key,
