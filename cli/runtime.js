@@ -68,7 +68,7 @@ class Runtime {
 		}
 	}
 
-	async root_and_child_valid(root, child) {
+	async rootAndChildValid(root, child) {
 		return await this.api.rpc.rootOfTrust.isChildCertificateValid(root, child)
 	}
 }
