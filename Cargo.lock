@@ -3176,7 +3176,11 @@ name = "pki-node"
 version = "2.0.0"
 dependencies = [
  "futures 0.3.4",
+ "jsonrpc-core",
+ "jsonrpc-core-client",
+ "jsonrpc-derive",
  "log",
+ "pallet-root-of-trust-rpc",
  "pki-runtime",
  "sc-basic-authorship",
  "sc-cli",
@@ -3186,6 +3190,7 @@ dependencies = [
  "sc-executor",
  "sc-finality-grandpa",
  "sc-network",
+ "sc-rpc",
  "sc-service",
  "sc-transaction-pool",
  "sp-consensus",
