@@ -1,0 +1,25 @@
+name: Docker CLI
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest 
+
+    steps:
+    - name: Copy Repo Files
+      uses: actions/checkout@master
+    - name: Publish Docker Image to GPR
+      uses: machine-learning-apps/gpr-docker-publish@master
+      with:
+        cache: true
+        IMAGE_NAME: 'pki-cli'
+        TAG: 'latest'
+        DOCKERFILE_PATH: './cli/Dockerfile'
+        BUILD_CONTEXT: './cli'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

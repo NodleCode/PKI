@@ -2,6 +2,11 @@
 
 ## Building the docker images
 
+> The docker images are also available in the
+> [Github Package Registry](https://github.com/NodleCode/PKI/packages). You
+> will want to refer to the [github documentation](https://help.github.com/en/packages/using-github-packages-with-your-projects-ecosystem/configuring-docker-for-use-with-github-packages)
+> as to how to pull them on your local machine.
+
 1. Build the `pki-node` image: `docker build -t nodle/pki-node .`
 2. Build the `pki-cli` image: `cd cli && docker build -t nodle/pki-cli .`
 
