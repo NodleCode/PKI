@@ -84,7 +84,7 @@ class Certificate {
 		}
 
 		const chainStateOk = await runtime.rootAndChildValid(decoded.payload.signerAddress, decoded.payload.deviceAddress);
-		if (!chainStateOk) {
+		if (chainStateOk == false) {
 			console.log('Root / Child not valid or revoked');
 			return false
 		}
