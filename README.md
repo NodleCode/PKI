@@ -4,6 +4,8 @@
 A set of modules to manage a decentralized and distributed PKI. A Token Curated Registry
 is used to manage in a decentralized way signing authorities that can issue "certificates".
 
+**We have migrated and updated the pallets present in this repository to the [main nodle chain repo](https://github.com/NodleCode/chain). This solution is becoming part of Nodle's Identity Stack.**
+
 # Development
 
 ## Building
