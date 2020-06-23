@@ -5,8 +5,7 @@ const { u8aToHex } = require('@polkadot/util');
 const { randomAsU8a } = require('@polkadot/util-crypto');
 const moment = require('moment');
 
-const Certificate = require('./certificate');
-const Runtime = require('./runtime');
+const { Certificate, Runtime } = require('pki');
 
 require('yargs')
 	.usage('Usage: $0 [--seed <seed>] <command> [options]')
@@ -16,12 +15,12 @@ require('yargs')
 		(b) => b,
 		(argv) => {
 			const keyring = new Keyring({ type: 'ed25519' });
-	        const seed = randomAsU8a(32);
-    	    const newKey = keyring.addFromSeed(seed);
+			const seed = randomAsU8a(32);
+			const newKey = keyring.addFromSeed(seed);
 
-        	console.log(`Address ........ : ${newKey.address}`);
-        	console.log(`Public key ..... : ${u8aToHex(newKey.publicKey)}`);
-        	console.log(`Seed ........... : ${u8aToHex(seed)}`);
+			console.log(`Address ........ : ${newKey.address}`);
+			console.log(`Public key ..... : ${u8aToHex(newKey.publicKey)}`);
+			console.log(`Seed ........... : ${u8aToHex(seed)}`);
 		},
 	)
 	.command(
