@@ -17,9 +17,9 @@ jobs:
       uses: machine-learning-apps/gpr-docker-publish@master
       with:
         cache: true
-        IMAGE_NAME: 'pki-cli'
+        IMAGE_NAME: 'pki-utils'
         TAG: 'latest'
-        DOCKERFILE_PATH: './cli/Dockerfile'
-        BUILD_CONTEXT: './cli'
+        DOCKERFILE_PATH: './nodejs/Dockerfile'
+        BUILD_CONTEXT: './nodejs'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
