@@ -1,24 +1,27 @@
 #!/usr/bin/env node
 
 const Keystore = require('./keystore');
+const enterFactoryMode = require('./mode_factory');
 const argv = require('yargs')
-    .usage('Usage: $0 [--keystore <keystore_path>]')
+    .usage('Usage: $0 [--keystore <keystore_path>] [--port <server_listening_port>] [--host <server_host>]')
     .describe('seed', 'Specify a seed used to sign transactions')
     .help()
     .epilog('copyright Nodle 2020')
     .argv;
 
-const enterFactoryMode = () => {
-    console.log('Factory mode');
-}
-
-const enterOperatingMode = () => {
-    console.log('Operating mode');
-}
+const enterOperatingMode = () => { }
 
 const main = async () => {
     if (argv.keystore === undefined) {
         argv.keystore = '~/.nodle_pki_keystore.json';
+    }
+
+    if (argv.port === undefined) {
+        argv.port = 8080;
+    }
+
+    if (argv.host === undefined) {
+        argv.host = 'localhost';
     }
 
     // First we load the local devices keys, if none are present
@@ -34,10 +37,12 @@ const main = async () => {
     // world production scenario the keys would be managed through
     // a secure element and the certificate provisioned at the
     // factory in the assembly lines.
-    if (!keystore.hasCertificate()) {
-        enterFactoryMode();
-    } else {
-        enterOperatingMode();
+    while (true) {
+        if (!keystore.hasCertificate()) {
+            await enterFactoryMode(keystore, argv.port, argv.host);
+        } else {
+            enterOperatingMode();
+        }
     }
 }
 

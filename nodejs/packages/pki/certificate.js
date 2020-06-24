@@ -47,12 +47,16 @@ class Certificate {
 		return Buffer.from(JSON.stringify(signed)).toString('base64')
 	}
 
-	static async verify(encodedCertificate, runtime) {
+	static decodeCertificate(encodedCertificate) {
 		const buff = Buffer.from(encodedCertificate, 'base64');
 		const json = buff.toString('ascii');
-		const decoded = JSON.parse(json);
+		return JSON.parse(json);
+	}
 
-		if (decoded.version != '0.1') {
+	static verifyCertificateWithoutIssuerChecks(encodedCertificate) {
+		const decoded = this.decodeCertificate(encodedCertificate);
+
+		if (decoded.version !== '0.1') {
 			throw new Error('unknown certificate version');
 		}
 
@@ -83,6 +87,15 @@ class Certificate {
 			return false
 		}
 
+		return true;
+	}
+
+	static async verify(encodedCertificate, runtime) {
+		if (!this.verifyCertificateWithoutIssuerChecks(encodedCertificate)) {
+			return false;
+		}
+
+		const decoded = this.decodeCertificate(encodedCertificate);
 		const chainStateOk = await runtime.rootAndChildValid(decoded.payload.signerAddress, decoded.payload.deviceAddress);
 		if (chainStateOk == false) {
 			console.log('Root / Child not valid or revoked');

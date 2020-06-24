@@ -11,6 +11,7 @@
   },
   "scripts": {
     "bootstrap": "lerna bootstrap --use-workspaces",
-    "cli": "node ./packages/cli/index.js"
+    "cli": "node ./packages/cli/index.js",
+    "firmware": "node ./packages/firmware/index.js"
   }
 }

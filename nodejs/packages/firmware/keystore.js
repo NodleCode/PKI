@@ -1,5 +1,3 @@
-const { Certificate, Runtime } = require('pki');
-
 const { Keyring } = require('@polkadot/api');
 const { randomAsU8a } = require('@polkadot/util-crypto');
 const { hexToU8a, u8aToHex } = require('@polkadot/util');
@@ -7,53 +5,55 @@ const expandHomeDir = require('expand-home-dir');
 const fs = require('fs');
 
 class Keystore {
-    seed = null;
     keyring = null;
     account = null;
     certificate = undefined;
+    path = null;
+    seed = null;
 
     constructor(path) {
-        const maybeExpanded = expandHomeDir(path);
-        let keystore = null;
-        if (fs.existsSync(maybeExpanded)) {
-            keystore = this.loadKeystore(maybeExpanded);
+        this.path = expandHomeDir(path);
+        if (fs.existsSync(this.path)) {
+            this.loadKeystore();
         } else {
-            keystore = this.generateAndSaveKeystore(maybeExpanded);
+            this.generateAndSaveKeystore();
         }
 
         // Load seed and certificate
         this.keyring = new Keyring({ type: 'ed25519' });
-        this.account = this.keyring.addFromSeed(keystore.seed);
-        this.certificate = keystore.certificate;
+        this.account = this.keyring.addFromSeed(this.seed);
     }
 
-    loadKeystore(path) {
-        const rawdata = fs.readFileSync(path);
+    loadKeystore() {
+        const rawdata = fs.readFileSync(this.path);
         const parsed = JSON.parse(rawdata);
 
-        return {
-            seed: hexToU8a(parsed.seed),
-            certificate: parsed.certificate,
-        };
+        this.seed = hexToU8a(parsed.seed);
+        this.certificate = parsed.certificate;
     }
 
     generateAndSaveKeystore(path) {
         const seed = randomAsU8a(32);
+        this.seed = seed;
 
-        const keystore = {
-            seed: u8aToHex(seed),
-        };
-        const data = JSON.stringify(keystore);
-        fs.writeFileSync(path, data);
+        this.saveKeystore();
+    }
 
-        return {
-            seed: seed,
-            certificate: undefined,
-        };
+    saveKeystore() {
+        const data = JSON.stringify({
+            seed: u8aToHex(this.seed),
+            certificate: this.certificate,
+        });
+        fs.writeFileSync(this.path, data);
     }
 
     hasCertificate() {
         return this.certificate !== undefined;
+    }
+
+    saveCertificate(certificate) {
+        this.certificate = certificate;
+        this.saveKeystore();
     }
 }
 
