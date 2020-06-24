@@ -927,7 +927,7 @@
     memoizee "^0.4.14"
     rxjs "^6.5.5"
 
-"@polkadot/api@1.21.1", "@polkadot/api@^1.8.1":
+"@polkadot/api@1.21.1", "@polkadot/api@^1.21.1", "@polkadot/api@^1.8.1":
   version "1.21.1"
   resolved "https://registry.yarnpkg.com/@polkadot/api/-/api-1.21.1.tgz#35b171a948c0c83996950936d52a0a23d0350fd0"
   integrity sha512-wR3dOoTzEVoxb8y2/mWs0MMxMnbIKQ+6ZfCStmHkc6pMNfkTnFTl72dm2qTXcBGwJr9Ack8qY0Rvs8yN9Xh41A==
@@ -2299,6 +2299,11 @@ expand-brackets@^2.1.4:
     regex-not "^1.0.0"
     snapdragon "^0.8.1"
     to-regex "^3.0.1"
+
+expand-home-dir@^0.0.3:
+  version "0.0.3"
+  resolved "https://registry.yarnpkg.com/expand-home-dir/-/expand-home-dir-0.0.3.tgz#72de8a0486cc28a3bbd704635398825b5b62827d"
+  integrity sha1-ct6KBIbMKKO71wRjU5iCW1tign0=
 
 ext@^1.1.2:
   version "1.4.0"
