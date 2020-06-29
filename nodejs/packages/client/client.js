@@ -4,6 +4,7 @@ const urljoin = require('url-join');
 const { Certificate } = require('pki');
 
 const PATH_IDENTITY = '/identity';
+const PATH_BURN = '/factory/certificate';
 
 class FirmwareClient {
     url = '';
@@ -23,7 +24,9 @@ class FirmwareClient {
         const certificate = new Certificate({ device: deviceAddress, pair: pair, expiry: expiry });
         const encoded = certificate.signAndEncode();
 
-        console.log(encoded);
+        await axios.post(urljoin(this.url, PATH_BURN), {
+            certificate: encoded,
+        });
     }
 }
 
