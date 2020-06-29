@@ -51,5 +51,18 @@ module.exports = {
 
             shutdown();
         };
+    },
+    challenge: (keystore) => {
+        return (req, res) => {
+            const challenge = req.body.challenge;
+            if (challenge === undefined) {
+                badRequest(res, 'missing challenge in post body');
+                return;
+            }
+
+            res.send({
+                signature: keystore.signChallenge(challenge),
+            });
+        }
     }
 }

@@ -55,6 +55,11 @@ class Keystore {
         this.certificate = certificate;
         this.saveKeystore();
     }
+
+    signChallenge(challenge) {
+        const decodedChallenge = hexToU8a(challenge);
+        return u8aToHex(this.account.sign(decodedChallenge));
+    }
 }
 
 module.exports = Keystore;

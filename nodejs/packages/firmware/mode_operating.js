@@ -8,6 +8,7 @@ const enterOperatingMode = async (keystore, port, host) => {
     const server = express();
     server.use(express.json());
     server.get('/identity', handlers.identity(keystore));
+    server.post('/challenge', handlers.challenge(keystore));
     server.listen(port, host);
 
     // We want this function to be blocking indefinitely.
