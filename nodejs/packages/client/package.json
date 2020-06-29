@@ -5,6 +5,8 @@
   "author": "Eliott Teissonniere",
   "license": "BSD-3-Clause-Clear",
   "dependencies": {
+    "@polkadot/api": "^1.21.1",
+    "@polkadot/util": "^2.16.1",
     "axios": "^0.19.2",
     "pki": "1.0.0",
     "url-join": "^4.0.1"

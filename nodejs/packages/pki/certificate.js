@@ -1,5 +1,5 @@
 const { Keyring } = require('@polkadot/api');
-const { stringToU8a, u8aToHex, u8aToU8a } = require('@polkadot/util');
+const { u8aToHex, u8aToU8a } = require('@polkadot/util');
 const blake = require('blakejs')
 const moment = require('moment');
 

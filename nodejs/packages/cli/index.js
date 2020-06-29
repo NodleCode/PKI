@@ -190,6 +190,25 @@ require('yargs')
 			process.exit(0);
 		},
 	)
+	.command(
+		'iot_verify <url>',
+		'Connect to the target IoT device running our POC firmware and verify its certificate',
+		(b) => b.positional('url', {
+			describe: 'url to reach out to talk to the device',
+			type: 'string'
+		}),
+		async (argv) => {
+			const runtime = new Runtime(argv.wsRpc);
+			await runtime.connect();
+
+			const client = new FirmwareClient(argv.url);
+			if (await client.verify(runtime)) {
+				console.log('Device has a valid and verified certificate');
+			}
+
+			process.exit(0);
+		},
+	)
 	.describe('seed', 'Specify a seed used to sign transactions')
 	.describe('ws-rpc', 'Specify the node WS RPC endpoint, default to localhost')
 	.help()
