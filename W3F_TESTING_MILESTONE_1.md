@@ -8,7 +8,7 @@
 > as to how to pull them on your local machine.
 
 1. Build the `pki-node` image: `docker build -t nodle/pki-node .`
-2. Build the `pki-utils` image: `cd nodes && docker build -t nodle/pki-utils .`
+2. Build the `pki-utils` image: `cd nodejs && docker build -t nodle/pki-utils .`
 
 
 ## Start the node
