@@ -9,10 +9,15 @@ const badRequest = (res, text) => {
 module.exports = {
     identity: (keystore) => {
         return (req, res) => {
-            res.send({
+            let reply = {
                 address: keystore.account.address,
                 hasCertificate: keystore.hasCertificate(),
-            });
+            };
+            if (reply.hasCertificate) {
+                reply.certificate = keystore.certificate;
+            }
+
+            res.send(reply);
         }
     },
     factoryCertificate: (keystore, shutdown) => {
@@ -41,6 +46,8 @@ module.exports = {
 
             keystore.saveCertificate(certificate);
             res.status(202).send({ accepted: true });
+
+            console.log('Certificate received and save, switching modes...');
 
             shutdown();
         };

@@ -1,11 +1,6 @@
 const express = require('express');
 const handlers = require('./handlers');
-
-const sleep = (ms) => {
-    return new Promise((resolve) => {
-        setTimeout(resolve, ms);
-    });
-}
+const sleep = require('./sleep');
 
 const enterFactoryMode = async (keystore, port, host) => {
     console.log('====== Factory Mode Enabled ======');

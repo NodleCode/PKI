@@ -2,14 +2,13 @@
 
 const Keystore = require('./keystore');
 const enterFactoryMode = require('./mode_factory');
+const enterOperatingMode = require('./mode_operating');
 const argv = require('yargs')
     .usage('Usage: $0 [--keystore <keystore_path>] [--port <server_listening_port>] [--host <server_host>]')
     .describe('seed', 'Specify a seed used to sign transactions')
     .help()
     .epilog('copyright Nodle 2020')
     .argv;
-
-const enterOperatingMode = () => { }
 
 const main = async () => {
     if (argv.keystore === undefined) {
@@ -41,7 +40,7 @@ const main = async () => {
         if (!keystore.hasCertificate()) {
             await enterFactoryMode(keystore, argv.port, argv.host);
         } else {
-            enterOperatingMode();
+            await enterOperatingMode(keystore, argv.port, argv.host);
         }
     }
 }
