@@ -1,16 +1,18 @@
-# PKI Cli
-A command line tool to interact with a PKI-enabled runtime and manage certificates.
+# PKI CLI and POC
+A set of node js module to handle our CLI our POC.
 
 # Development
 
 ## Building
 ```
-docker build -t nodle/pki-cli .
+docker build -t nodle/pki-utils .
 ```
 
 # Usage
+
+## CLI
 ```
-$ docker run -it nodle/pki-cli --help
+$ docker run -it nodle/pki-utils cli --help
 Usage: index.js [--seed <seed>] <command> [options]
 
 Commands:

@@ -8,7 +8,7 @@
 > as to how to pull them on your local machine.
 
 1. Build the `pki-node` image: `docker build -t nodle/pki-node .`
-2. Build the `pki-cli` image: `cd cli && docker build -t nodle/pki-cli .`
+2. Build the `pki-utils` image: `cd nodejs && docker build -t nodle/pki-utils .`
 
 
 ## Start the node
@@ -39,7 +39,7 @@ We will go through a sample flow by using the cli to interact with the Root Of
 Trust pallet.
 
 To simplify commands let's define an alias:
-`alias pki-cli='docker run --link pki-node -it nodle/pki-cli --ws-rpc ws://pki-node:9944'`.
+`alias pki-cli='docker run --link pki-node -it nodle/pki-utils cli --ws-rpc ws://pki-node:9944'`.
 
 
 Make sure to open https://polkadot.js.org/apps and connect to the local development node.

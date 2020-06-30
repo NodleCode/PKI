@@ -1,0 +1,16 @@
+{
+  "name": "firmware",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Eliott Teissonniere",
+  "license": "BSD-3-Clause-Clear",
+  "dependencies": {
+    "@polkadot/api": "^1.21.1",
+    "@polkadot/util": "^2.15.1",
+    "@polkadot/util-crypto": "^2.15.1",
+    "cors": "^2.8.5",
+    "expand-home-dir": "^0.0.3",
+    "express": "^4.17.1",
+    "pki": "1.0.0"
+  }
+}

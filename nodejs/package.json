@@ -1,0 +1,17 @@
+{
+  "name": "nodejs",
+  "private": true,
+  "author": "Eliott Teissonniere",
+  "license": "BSD-3-Clause-Clear",
+  "workspaces": [
+    "packages/*"
+  ],
+  "devDependencies": {
+    "lerna": "^3.22.1"
+  },
+  "scripts": {
+    "bootstrap": "lerna bootstrap --use-workspaces",
+    "cli": "node ./packages/cli/index.js",
+    "firmware": "node ./packages/firmware/index.js"
+  }
+}

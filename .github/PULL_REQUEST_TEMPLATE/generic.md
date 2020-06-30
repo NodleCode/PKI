@@ -18,6 +18,6 @@ notes.
 
 
 ## Quality
-- [] I have added unit tests
-- [] I have documented my changes
-- [] I have tested my changes
+- [ ] I have added unit tests
+- [ ] I have documented my changes
+- [ ] I have tested my changes

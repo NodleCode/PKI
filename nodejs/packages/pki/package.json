@@ -1,5 +1,5 @@
 {
-  "name": "pki-cli",
+  "name": "pki",
   "version": "1.0.0",
   "main": "index.js",
   "author": "Eliott Teissonniere",
@@ -7,7 +7,6 @@
   "dependencies": {
     "@polkadot/api": "^1.8.1",
     "blakejs": "^1.1.0",
-    "moment": "^2.24.0",
-    "yargs": "^15.3.1"
+    "moment": "^2.24.0"
   }
 }

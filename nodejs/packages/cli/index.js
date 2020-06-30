@@ -5,8 +5,8 @@ const { u8aToHex } = require('@polkadot/util');
 const { randomAsU8a } = require('@polkadot/util-crypto');
 const moment = require('moment');
 
-const Certificate = require('./certificate');
-const Runtime = require('./runtime');
+const { Certificate, Runtime } = require('pki');
+const { FirmwareClient } = require('client');
 
 require('yargs')
 	.usage('Usage: $0 [--seed <seed>] <command> [options]')
@@ -16,12 +16,12 @@ require('yargs')
 		(b) => b,
 		(argv) => {
 			const keyring = new Keyring({ type: 'ed25519' });
-	        const seed = randomAsU8a(32);
-    	    const newKey = keyring.addFromSeed(seed);
+			const seed = randomAsU8a(32);
+			const newKey = keyring.addFromSeed(seed);
 
-        	console.log(`Address ........ : ${newKey.address}`);
-        	console.log(`Public key ..... : ${u8aToHex(newKey.publicKey)}`);
-        	console.log(`Seed ........... : ${u8aToHex(seed)}`);
+			console.log(`Address ........ : ${newKey.address}`);
+			console.log(`Public key ..... : ${u8aToHex(newKey.publicKey)}`);
+			console.log(`Seed ........... : ${u8aToHex(seed)}`);
 		},
 	)
 	.command(
@@ -161,6 +161,50 @@ require('yargs')
 			runtime.setSigner(argv.seed);
 
 			console.log(`Submitted transaction ${await runtime.revokeChild(argv.signingAddress, argv.deviceAddress)}`);
+
+			process.exit(0);
+		},
+	)
+	.command(
+		'iot_burn <url>',
+		'Forge a new certificate, sign it and burn it into the targetted IoT device running our POC firmware',
+		(b) => b.positional('url', {
+			describe: 'url to reach out to talk to the device',
+			type: 'string'
+		}).positional('expiry', {
+			describe: 'specify in how much time the certificate expires',
+			type: 'string',
+			default: '1 month'
+		}),
+		async (argv) => {
+			const splitted = argv.expiry.split(" ");
+			const amount = parseInt(splitted[0]);
+			const unit = splitted[1];
+
+			const keyring = new Keyring({ type: 'ed25519' });
+			const pair = keyring.addFromUri(argv.seed);
+
+			const client = new FirmwareClient(argv.url);
+			await client.burn(pair, moment().add(amount, unit));
+
+			process.exit(0);
+		},
+	)
+	.command(
+		'iot_verify <url>',
+		'Connect to the target IoT device running our POC firmware and verify its certificate',
+		(b) => b.positional('url', {
+			describe: 'url to reach out to talk to the device',
+			type: 'string'
+		}),
+		async (argv) => {
+			const runtime = new Runtime(argv.wsRpc);
+			await runtime.connect();
+
+			const client = new FirmwareClient(argv.url);
+			if (await client.verify(runtime)) {
+				console.log('Device has a valid and verified certificate');
+			}
 
 			process.exit(0);
 		},

@@ -2,11 +2,6 @@ const { ApiPromise, WsProvider } = require('@polkadot/api');
 const { Keyring } = require('@polkadot/api');
 
 class Runtime {
-	api = null;
-	provider = null;
-	keyring = null;
-	signer = null;
-
 	constructor(wsRpcUrl) {
 		if (wsRpcUrl == undefined || wsRpcUrl == null || wsRpcUrl == "") {
 			wsRpcUrl = 'ws://localhost:9944';
@@ -65,7 +60,7 @@ class Runtime {
 	async slotStatus(signerAddress) {
 		const slot = await this.api.query.rootOfTrust.slots(signerAddress);
 		const isValid = await this.api.rpc.rootOfTrust.isRootCertificateValid(signerAddress);
-		
+
 		return {
 			signingAddress: slot.key,
 			ownerAddress: slot.owner,
@@ -84,25 +79,25 @@ class Runtime {
 	async bookSlot(slotAddress) {
 		return await this.api.tx.rootOfTrust
 			.bookSlot(slotAddress)
-			.signAndSend(this.signer)		
+			.signAndSend(this.signer)
 	}
 
 	async renewSlot(slotAddress) {
 		return await this.api.tx.rootOfTrust
 			.renewSlot(slotAddress)
-			.signAndSend(this.signer)		
+			.signAndSend(this.signer)
 	}
 
 	async revokeSlot(slotAddress) {
 		return await this.api.tx.rootOfTrust
 			.revokeSlot(slotAddress)
-			.signAndSend(this.signer)		
+			.signAndSend(this.signer)
 	}
 
 	async revokeChild(root, child) {
 		return await this.api.tx.rootOfTrust
 			.revokeChild(root, child)
-			.signAndSend(this.signer)		
+			.signAndSend(this.signer)
 	}
 }
 

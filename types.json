@@ -1,6 +1,7 @@
 {
   "CertificateId": "AccountId",
   "Address": "AccountId",
+  "Weight": "u32",
   "Application": {
     "candidate": "AccountId",
     "candidate_deposit": "Balance",
