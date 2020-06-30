@@ -16,10 +16,11 @@ class DeviceForm extends React.Component {
 
     render() {
         return (
-            <Pane background='greenTint'>
-                <Heading size={700} marginTop="default">Choose Target Device</Heading>
+            <Pane>
+                <Heading size={700}>Choose a Target Device</Heading>
                 <TextInputField
                     placeholder='http://raspberrypi.local:8080'
+                    label='Device Url'
                     value={this.state.value}
                     onChange={e => this.setState({ value: e.target.value })} />
                 <Button intent='success' onClick={this.submit}>Access Device</Button>

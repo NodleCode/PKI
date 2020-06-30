@@ -11,19 +11,27 @@ const PATH_BURN = '/factory/certificate';
 const PATH_CHALLENGE = '/challenge';
 
 class FirmwareClient {
-    url = '';
-
     constructor(url) {
         this.url = url;
+    }
+
+    // Use this call to get basic details
+    async fetchDetails() {
+        const identity = await axios.get(urljoin(this.url, PATH_IDENTITY));
+
+        return {
+            address: identity.data.address,
+            hasCertificate: identity.data.hasCertificate,
+        };
     }
 
     // This call can be used to 'burn' a certificate on a device running our 'firmware.
     // It will connect to it, get its public key and issue a certificate.
     async burn(pair, expiry) {
-        const identity = await axios.get(urljoin(this.url, PATH_IDENTITY));
-        const deviceAddress = identity.data.address;
+        const details = await this.fetchDetails();
+        const deviceAddress = details.address;
 
-        if (identity.data.hasCertificate) {
+        if (details.hasCertificate) {
             throw new Error('Firmware no longer in factory mode');
         }
 
@@ -38,15 +46,15 @@ class FirmwareClient {
     // This call can be used to connect to a device and verify its certificate and possession
     // of its cryptographic materials by issuing it a challenge.
     async verify(runtime) {
-        const identity = await axios.get(urljoin(this.url, PATH_IDENTITY));
-        const certificateIsValid = Certificate.verify(identity.data.certificate, runtime);
+        const details = await this.fetchDetails();
+        const certificateIsValid = Certificate.verify(details.certificate, runtime);
         if (!certificateIsValid) {
             throw new Error('the certificate is not valid');
         }
 
         // We know the certificate is valid but was it issued for this device
-        const decodedCertificate = Certificate.decodeCertificate(identity.data.certificate);
-        const certificateIsForThisDevice = decodedCertificate.payload.deviceAddress == identity.data.address;
+        const decodedCertificate = Certificate.decodeCertificate(details.certificate);
+        const certificateIsForThisDevice = decodedCertificate.payload.deviceAddress == details.address;
         if (!certificateIsForThisDevice) {
             throw new Error('the certificate was not issued for this device');
         }
@@ -62,7 +70,7 @@ class FirmwareClient {
             throw new Error('no signature present in challenge reply');
         }
         const keyring = new Keyring({ type: 'ed25519' });
-        const signerPair = keyring.addFromAddress(identity.data.address);
+        const signerPair = keyring.addFromAddress(details.address);
         const deviceSignedTheChallenge = signerPair.verify(challenge, signature);
         if (!deviceSignedTheChallenge) {
             throw new Error('the device was not able to prove ownership of its keypair');

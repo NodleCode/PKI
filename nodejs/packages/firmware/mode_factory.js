@@ -1,3 +1,4 @@
+const cors = require('cors');
 const express = require('express');
 const handlers = require('./handlers');
 const sleep = require('./sleep');
@@ -17,6 +18,7 @@ const enterFactoryMode = async (keystore, port, host) => {
         shutdownCalled = true;
     };
     server.use(express.json());
+    server.use(cors());
     server.get('/identity', handlers.identity(keystore));
     server.post('/factory/certificate', handlers.factoryCertificate(keystore, shutdownTheServer));
     closer = server.listen(port, host);

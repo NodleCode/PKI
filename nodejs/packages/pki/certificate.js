@@ -4,12 +4,6 @@ const blake = require('blakejs')
 const moment = require('moment');
 
 class Certificate {
-	deviceAddress = '';
-	signerAddress = '';
-	signerKeypair = null;
-	creationDate = null;
-	expirationDate = null;
-
 	constructor(description) {
 		this.deviceAddress = description.device;
 		this.signerKeypair = description.pair;
