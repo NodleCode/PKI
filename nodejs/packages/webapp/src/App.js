@@ -1,5 +1,6 @@
 import React from 'react';
-import { Button, Pane } from 'evergreen-ui'
+import { Pane } from 'evergreen-ui';
+import { DeviceForm } from './components';
 
 class App extends React.Component {
   render() {
@@ -9,7 +10,7 @@ class App extends React.Component {
         alignItems="center"
         justifyContent="center"
       >
-        <Button>I am using Evergreen!</Button>
+        <DeviceForm onSubmit={(url) => alert(url)} />
       </ Pane>
     );
   }
