@@ -1,4 +1,4 @@
-# W3F Testing Instructions
+# W3F Testing Instructions for Milestone 1
 
 ## Building the docker images
 
