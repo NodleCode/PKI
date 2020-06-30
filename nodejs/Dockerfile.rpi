@@ -1,0 +1,15 @@
+# We have to fine tune our Dockerfile when building for the pi zero w.
+# It seems like there are some issues when docker tries to guess the device's
+# architecture, thus we need to force it manually and go through an alpine image.
+
+FROM arm32v6/node:12-alpine
+
+WORKDIR /usr/src/app
+COPY package*.json ./
+
+RUN yarn install --network-timeout 1000000
+
+COPY . .
+RUN yarn bootstrap
+
+ENTRYPOINT ["yarn"]

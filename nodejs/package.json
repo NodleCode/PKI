@@ -10,7 +10,7 @@
     "lerna": "^3.22.1"
   },
   "scripts": {
-    "bootstrap": "lerna bootstrap --use-workspaces",
+    "bootstrap": "lerna bootstrap --use-workspaces -- --network-timeout 1000000",
     "cli": "node ./packages/cli/index.js",
     "firmware": "node ./packages/firmware/index.js",
     "webapp": "cd packages/webapp && yarn start"
