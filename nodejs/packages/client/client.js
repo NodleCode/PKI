@@ -22,6 +22,7 @@ class FirmwareClient {
         return {
             address: identity.data.address,
             hasCertificate: identity.data.hasCertificate,
+            certificate: identity.data.certificate,
         };
     }
 
