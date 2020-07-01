@@ -29,7 +29,7 @@ class DeviceForm extends React.Component {
                   value={this.state.value}
                   onChange={e => this.setState({ value: e.target.value })} />
                 <Button 
-                  intent='default'
+                  intent='none'
                   onClick={this.submit}>
                   Access Device
                 </Button>

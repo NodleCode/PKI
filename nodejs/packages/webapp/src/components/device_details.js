@@ -43,7 +43,7 @@ class DeviceDetails extends React.Component {
                   <Button 
                     borderRadius="5px"
                     marginTop="12px"
-                    intent='default' 
+                    intent='none' 
                     onClick={this.props.onVerifyClicked} 
                     disabled={!this.state.hasCertificate}>
                     Verify The Device Certificate
