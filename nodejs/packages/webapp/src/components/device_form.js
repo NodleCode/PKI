@@ -17,13 +17,22 @@ class DeviceForm extends React.Component {
     render() {
         return (
             <Pane>
-                <Heading size={700}>Choose a Target Device</Heading>
+                <Heading 
+                  marginBottom="10px"
+                  size={700}>
+                  Enter Target Device
+                </Heading>
                 <TextInputField
-                    placeholder='http://raspberrypi.local:8080'
-                    label='Device Url'
-                    value={this.state.value}
-                    onChange={e => this.setState({ value: e.target.value })} />
-                <Button intent='success' onClick={this.submit}>Access Device</Button>
+                  width="400px"
+                  placeholder='http://raspberrypi.local:8080'
+                  label=""
+                  value={this.state.value}
+                  onChange={e => this.setState({ value: e.target.value })} />
+                <Button 
+                  intent='default'
+                  onClick={this.submit}>
+                  Access Device
+                </Button>
             </Pane>
         );
     }

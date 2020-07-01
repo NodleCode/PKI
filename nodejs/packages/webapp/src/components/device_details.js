@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Heading, Pane, Spinner, Text } from 'evergreen-ui';
+import { Button, Heading, Pane, Spinner, Text, KeyIcon } from 'evergreen-ui';
 
 import { FirmwareClient } from 'client';
 
@@ -23,10 +23,31 @@ class DeviceDetails extends React.Component {
     render() {
         if (this.state.address !== '') {
             return (
-                <Pane>
-                    <Heading size={700}>Device Details</Heading>
-                    <Text>Address: {this.state.address}.</Text>
-                    <Button intent='none' onClick={this.props.onVerifyClicked} disabled={!this.state.hasCertificate}>Verify The Device Certificate</Button>
+                <Pane
+                  display="flex"
+                  flexDirection="column"
+                  alignItems="flex-start">
+                  <Heading 
+                    size={700}>
+                    Device Address
+                  </Heading>
+                  <Pane
+                    marginY="12px;">
+                    <KeyIcon 
+                      marginRight="10px"/>
+                    <Text>
+                      {this.state.address}
+                    </Text>
+                  </Pane>
+                  
+                  <Button 
+                    borderRadius="5px"
+                    marginTop="12px"
+                    intent='default' 
+                    onClick={this.props.onVerifyClicked} 
+                    disabled={!this.state.hasCertificate}>
+                    Verify The Device Certificate
+                  </Button>
                 </Pane>
             );
         }
