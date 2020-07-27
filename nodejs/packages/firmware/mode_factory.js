@@ -20,7 +20,7 @@ const enterFactoryMode = async (keystore, port, host) => {
     server.use(express.json());
     server.use(cors());
     server.get('/identity', handlers.identity(keystore));
-    server.post('/factory/certificate', handlers.factoryCertificate(keystore, shutdownTheServer));
+    server.post('/certificate', handlers.factoryCertificate(keystore, shutdownTheServer));
     closer = server.listen(port, host);
 
     while (!shutdownCalled) {

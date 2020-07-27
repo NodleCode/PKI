@@ -1,3 +1,4 @@
+
 const { Keyring } = require('@polkadot/api');
 const { randomAsU8a } = require('@polkadot/util-crypto');
 const { hexToU8a, u8aToHex } = require('@polkadot/util');
@@ -5,13 +6,8 @@ const expandHomeDir = require('expand-home-dir');
 const fs = require('fs');
 
 class Keystore {
-    keyring = null;
-    account = null;
-    certificate = undefined;
-    path = null;
-    seed = null;
-
     constructor(path) {
+        this.certificates = [];
         this.path = expandHomeDir(path);
         if (fs.existsSync(this.path)) {
             this.loadKeystore();
@@ -19,7 +15,6 @@ class Keystore {
             this.generateAndSaveKeystore();
         }
 
-        // Load seed and certificate
         this.keyring = new Keyring({ type: 'ed25519' });
         this.account = this.keyring.addFromSeed(this.seed);
     }
@@ -29,7 +24,7 @@ class Keystore {
         const parsed = JSON.parse(rawdata);
 
         this.seed = hexToU8a(parsed.seed);
-        this.certificate = parsed.certificate;
+        this.certificates = parsed.certificates;
     }
 
     generateAndSaveKeystore(path) {
@@ -42,17 +37,17 @@ class Keystore {
     saveKeystore() {
         const data = JSON.stringify({
             seed: u8aToHex(this.seed),
-            certificate: this.certificate,
+            certificates: this.certificates,
         });
         fs.writeFileSync(this.path, data);
     }
 
     hasCertificate() {
-        return this.certificate !== undefined;
+        return this.certificates.length > 0;
     }
 
     saveCertificate(certificate) {
-        this.certificate = certificate;
+        this.certificates.push(certificate);
         this.saveKeystore();
     }
 
