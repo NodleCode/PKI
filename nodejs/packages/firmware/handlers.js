@@ -6,7 +6,7 @@ const badRequest = (res, text) => {
     });
 }
 
-const validateAndStoreNewCertificate = (keystore, req, res) => {
+const validateAndStoreNewCertificate = async (keystore, req, res) => {
     const certificate = req.body.certificate;
     if (certificate === undefined) {
         badRequest(res, 'missing certificate in post body');
@@ -19,13 +19,20 @@ const validateAndStoreNewCertificate = (keystore, req, res) => {
     // us.
     // We wrap the call in a try catch as a decoding error may happen
     // with malicious entries.
-    try {
-        if (!Certificate.verifyCertificateWithoutIssuerChecks(certificate)) {
-            badRequest(res, 'certificate is not for this device');
-            return;
-        }
-    } catch (error) {
-        badRequest(res, `an error happened while decoding your certificate: ${error.toString()}`);
+    let invalidReason = '';
+    const valid = await Certificate.verifyCertificateWithoutIssuerChecks(certificate, (unusedCert, reason) => {
+        invalidReason = reason;
+    })
+
+    if (!valid) {
+        badRequest(res, `Invalid certificate: ${invalidReason}`);
+        return;
+    }
+
+    const decoded = Certificate.decodeCertificate(certificate);
+    const forThisDevice = decoded.payload.deviceAddress == keystore.account.address;
+    if (!forThisDevice) {
+        badRequest(res, 'Certificate not intended for this device');
         return;
     }
 
@@ -50,8 +57,8 @@ module.exports = {
         }
     },
     factoryCertificate: (keystore, shutdown) => {
-        return (req, res) => {
-            validateAndStoreNewCertificate(keystore, req, res);
+        return async (req, res) => {
+            await validateAndStoreNewCertificate(keystore, req, res);
 
             shutdown();
         };
@@ -70,8 +77,8 @@ module.exports = {
         }
     },
     runtimeCertificate: (keystore) => {
-        return (req, res) => {
-            validateAndStoreNewCertificate(keystore, req, res);
+        return async (req, res) => {
+            await validateAndStoreNewCertificate(keystore, req, res);
         }
     }
 }

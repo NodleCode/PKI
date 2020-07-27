@@ -21,7 +21,7 @@ class DeviceForm extends React.Component {
           marginBottom="10px"
           size={700}>
           Enter Target Device
-                </Heading>
+        </Heading>
         <TextInputField
           width="400px"
           placeholder='http://raspberrypi.local:8080'
@@ -32,7 +32,7 @@ class DeviceForm extends React.Component {
           intent='none'
           onClick={this.submit}>
           Access Device
-                </Button>
+        </Button>
       </Pane>
     );
   }

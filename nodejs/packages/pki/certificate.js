@@ -47,16 +47,17 @@ class Certificate {
 		return JSON.parse(json);
 	}
 
-	static verifyCertificateWithoutIssuerChecks(encodedCertificate) {
+	static verifyCertificateWithoutIssuerChecks(encodedCertificate, onCertificateInvalid) {
 		const decoded = this.decodeCertificate(encodedCertificate);
 
 		if (decoded.version !== '0.1') {
-			throw new Error('unknown certificate version');
+			onCertificateInvalid(encodedCertificate, 'Unsupported version');
+			return false;
 		}
 
 		const expired = moment.unix(decoded.payload.expirationDate).isBefore();
 		if (expired) {
-			console.log('Certificate expired');
+			onCertificateInvalid(encodedCertificate, 'Expired');
 			return false
 		}
 
@@ -71,32 +72,32 @@ class Certificate {
 
 		const hashMatch = decoded.hash == u8aToHex(u8aHash);
 		if (!hashMatch) {
-			console.log('Certificate hash mismatch');
+			onCertificateInvalid(encodedCertificate, 'Hash mismatch');
 			return false
 		}
 
 		const signatureOk = signerPair.verify(u8aHash, u8aToU8a(decoded.signature));
 		if (!signatureOk) {
-			console.log('Certificate signature unverified');
+			onCertificateInvalid(encodedCertificate, 'Bad signature')
 			return false
 		}
 
 		return true;
 	}
 
-	static async verify(encodedCertificate, runtime) {
-		if (!this.verifyCertificateWithoutIssuerChecks(encodedCertificate)) {
-			return false;
+	static async verify(encodedCertificate, runtime, onCertificateInvalid) {
+		if (!this.verifyCertificateWithoutIssuerChecks(encodedCertificate, onCertificateInvalid)) {
+			return false; // Callback already called
 		}
 
 		const decoded = this.decodeCertificate(encodedCertificate);
 		const chainStateOk = await runtime.rootAndChildValid(decoded.payload.signerAddress, decoded.payload.deviceAddress);
 		if (chainStateOk == false) {
-			console.log('Root / Child not valid or revoked');
-			return false
+			onCertificateInvalid(encodedCertificate, 'Root / Child does not exist or was revoked')
+			return false;
 		}
 
-		return true
+		return true;
 	}
 }
 

@@ -30,7 +30,7 @@ class DeviceDetails extends React.Component {
           <Heading
             size={700}>
             Device Address
-                  </Heading>
+          </Heading>
           <Pane
             marginY="12px;">
             <KeyIcon
@@ -47,7 +47,7 @@ class DeviceDetails extends React.Component {
             onClick={this.props.onVerifyClicked}
             disabled={!this.state.hasCertificate}>
             Verify The Device Certificates
-                  </Button>
+          </Button>
         </Pane>
       );
     }
