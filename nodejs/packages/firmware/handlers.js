@@ -43,7 +43,7 @@ module.exports = {
                 hasCertificate: keystore.hasCertificate(),
             };
             if (reply.hasCertificate) {
-                reply.certificate = keystore.certificate;
+                reply.certificates = keystore.certificates;
             }
 
             res.send(reply);

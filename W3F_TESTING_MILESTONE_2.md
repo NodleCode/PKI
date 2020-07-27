@@ -97,11 +97,10 @@ There are two ways to verify the device's certificate, let's try with the cli:
 ```
 $ pki-cli iot_verify http://elchapo.local:8080
 yarn run v1.22.4
-$ node ./packages/cli/index.js --ws-rpc ws://pki-node:9944 iot_verify http://elchapo.local:8080
+$ node ./packages/cli/index.js --ws-rpc ws://127.0.0.1:9944 iot_verify http://elchapo.local:8080
 Unknown types found, no types for Application
-Root / Child not valid or revoked
 Device has a valid and verified certificate
-Done in 1.99s.
+✨  Done in 1.11s.
 ```
 
 But this milestone also included a web POC app, navigate to it and enter the raspberry pi url, click `Access` then `Verify`. You should see a success message!

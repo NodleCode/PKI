@@ -22,7 +22,7 @@ class FirmwareClient {
         return {
             address: identity.data.address,
             hasCertificate: identity.data.hasCertificate,
-            certificate: identity.data.certificate,
+            certificates: identity.data.certificates,
         };
     }
 
@@ -40,18 +40,31 @@ class FirmwareClient {
         });
     }
 
-    // This call can be used to connect to a device and verify its certificate and possession
+    // This call can be used to connect to a device and verify its certificates and possession
     // of its cryptographic materials by issuing it a challenge.
     async verify(runtime) {
         const details = await this.fetchDetails();
-        const certificateIsValid = Certificate.verify(details.certificate, runtime);
+
+        for (const cert of details.certificates) {
+            if (!await this.verifyIndividualCertificate(runtime, cert, details.address)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Sub routine to proceed to a device verification, it verifies an individual certificate
+    // sequentially
+    async verifyIndividualCertificate(runtime, cert, deviceAddress) {
+        const certificateIsValid = Certificate.verify(cert, runtime);
         if (!certificateIsValid) {
             throw new Error('the certificate is not valid');
         }
 
         // We know the certificate is valid but was it issued for this device
-        const decodedCertificate = Certificate.decodeCertificate(details.certificate);
-        const certificateIsForThisDevice = decodedCertificate.payload.deviceAddress == details.address;
+        const decodedCertificate = Certificate.decodeCertificate(cert);
+        const certificateIsForThisDevice = decodedCertificate.payload.deviceAddress == deviceAddress;
         if (!certificateIsForThisDevice) {
             throw new Error('the certificate was not issued for this device');
         }
@@ -67,7 +80,7 @@ class FirmwareClient {
             throw new Error('no signature present in challenge reply');
         }
         const keyring = new Keyring({ type: 'ed25519' });
-        const signerPair = keyring.addFromAddress(details.address);
+        const signerPair = keyring.addFromAddress(deviceAddress);
         const deviceSignedTheChallenge = signerPair.verify(challenge, signature);
         if (!deviceSignedTheChallenge) {
             throw new Error('the device was not able to prove ownership of its keypair');
