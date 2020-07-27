@@ -107,6 +107,11 @@ Done in 1.99s.
 But this milestone also included a web POC app, navigate to it and enter the raspberry pi url, click `Access` then `Verify`. You should see a success message!
 
 
+### Bonus: add more certificates to the device
+
+You can use the `iot_burn` command to push new certificates to the device. When verifying the device it will loop through all the current certificates of the device.
+
+
 ### Turning the device rogue
 
 The goal of using certificates is to know if a device is genuine or not. Let's simulate this scenario by "compromising" the Raspberry Pi:

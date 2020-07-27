@@ -7,7 +7,7 @@ const { u8aToHex } = require('@polkadot/util');
 const { Certificate } = require('pki');
 
 const PATH_IDENTITY = '/identity';
-const PATH_BURN = '/factory/certificate';
+const PATH_BURN = '/certificate';
 const PATH_CHALLENGE = '/challenge';
 
 class FirmwareClient {
@@ -31,10 +31,6 @@ class FirmwareClient {
     async burn(pair, expiry) {
         const details = await this.fetchDetails();
         const deviceAddress = details.address;
-
-        if (details.hasCertificate) {
-            throw new Error('Firmware no longer in factory mode');
-        }
 
         const certificate = new Certificate({ device: deviceAddress, pair: pair, expiry: expiry });
         const encoded = certificate.signAndEncode();
@@ -80,6 +76,9 @@ class FirmwareClient {
         // We did it!
         return true;
     }
+
+    // This call can be used to connect to a given device and issue it a new certificate,
+    // for instance, this could be useful when renewing a certificate, or maybe 
 }
 
 module.exports = FirmwareClient;
