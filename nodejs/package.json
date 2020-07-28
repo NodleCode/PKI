@@ -14,6 +14,6 @@
     "cli": "node ./packages/cli/index.js",
     "firmware": "node ./packages/firmware/index.js",
     "webapp": "cd packages/webapp && yarn start",
-    "test": "echo TBD"
+    "test": "lerna run test"
   }
 }
