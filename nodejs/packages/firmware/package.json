@@ -4,6 +4,9 @@
   "main": "index.js",
   "author": "Eliott Teissonniere",
   "license": "BSD-3-Clause-Clear",
+  "scripts": {
+    "test": "mocha"
+  },
   "dependencies": {
     "@polkadot/api": "^1.21.1",
     "@polkadot/util": "^2.15.1",
@@ -12,5 +15,9 @@
     "expand-home-dir": "^0.0.3",
     "express": "^4.17.1",
     "pki": "1.0.0"
+  },
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "mocha": "^8.0.1"
   }
 }
