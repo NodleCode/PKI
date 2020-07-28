@@ -1,9 +1,12 @@
+const errors = require('./errors');
 const { Keyring } = require('@polkadot/api');
 const { u8aToHex, u8aToU8a } = require('@polkadot/util');
 const blake = require('blakejs')
 const moment = require('moment');
 
 class Certificate {
+	version = '0.1'
+
 	constructor(description) {
 		this.deviceAddress = description.device;
 		this.signerKeypair = description.pair;
@@ -28,17 +31,17 @@ class Certificate {
 		const u8aSignature = this.signerKeypair.sign(u8aHash);
 
 		return {
-			version: '0.1',
+			version: this.version,
 			payload: rawMessage,
 			hash: u8aToHex(u8aHash),
 			signature: u8aToHex(u8aSignature)
-		}
+		};
 	}
 
 	signAndEncode() {
 		const signed = this.sign();
 
-		return Buffer.from(JSON.stringify(signed)).toString('base64')
+		return Buffer.from(JSON.stringify(signed)).toString('base64');
 	}
 
 	static decodeCertificate(encodedCertificate) {
@@ -51,13 +54,13 @@ class Certificate {
 		const decoded = this.decodeCertificate(encodedCertificate);
 
 		if (decoded.version !== '0.1') {
-			onCertificateInvalid(encodedCertificate, 'Unsupported version');
+			onCertificateInvalid(encodedCertificate, errors.errUnsupportedVersion);
 			return false;
 		}
 
 		const expired = moment.unix(decoded.payload.expirationDate).isBefore();
 		if (expired) {
-			onCertificateInvalid(encodedCertificate, 'Expired');
+			onCertificateInvalid(encodedCertificate, errors.errExpired);
 			return false
 		}
 
@@ -72,13 +75,13 @@ class Certificate {
 
 		const hashMatch = decoded.hash == u8aToHex(u8aHash);
 		if (!hashMatch) {
-			onCertificateInvalid(encodedCertificate, 'Hash mismatch');
+			onCertificateInvalid(encodedCertificate, errors.errHashMismatch);
 			return false
 		}
 
 		const signatureOk = signerPair.verify(u8aHash, u8aToU8a(decoded.signature));
 		if (!signatureOk) {
-			onCertificateInvalid(encodedCertificate, 'Bad signature')
+			onCertificateInvalid(encodedCertificate, errors.errBadSignature)
 			return false
 		}
 
@@ -93,7 +96,7 @@ class Certificate {
 		const decoded = this.decodeCertificate(encodedCertificate);
 		const chainStateOk = await runtime.rootAndChildValid(decoded.payload.signerAddress, decoded.payload.deviceAddress);
 		if (chainStateOk == false) {
-			onCertificateInvalid(encodedCertificate, 'Root / Child does not exist or was revoked')
+			onCertificateInvalid(encodedCertificate, errors.errChainSaysInvalid)
 			return false;
 		}
 
