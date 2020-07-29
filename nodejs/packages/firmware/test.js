@@ -33,3 +33,15 @@ describe('Firmware', () => {
         it('switch to operating mode when keys provisioned')
     })
 })
+
+describe('Keystore', () => {
+    context('Certificates', () => {
+        it('load and save correctly with one certificate')
+
+        it('load and save correctly with many certificates')
+    })
+
+    context('Challenges', () => {
+        it('succesfully solve challenges')
+    })
+})
