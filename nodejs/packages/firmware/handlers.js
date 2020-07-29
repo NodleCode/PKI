@@ -6,7 +6,7 @@ const badRequest = (res, text) => {
     });
 }
 
-const validateAndStoreNewCertificate = async (keystore, req, res) => {
+const validateAndStoreNewCertificate = (keystore, req, res) => {
     const certificate = req.body.certificate;
     if (certificate === undefined) {
         badRequest(res, 'missing certificate in post body');
@@ -20,7 +20,7 @@ const validateAndStoreNewCertificate = async (keystore, req, res) => {
     // We wrap the call in a try catch as a decoding error may happen
     // with malicious entries.
     let invalidReason = '';
-    const valid = await Certificate.verifyCertificateWithoutIssuerChecks(certificate, (unusedCert, reason) => {
+    const valid = Certificate.verifyCertificateWithoutIssuerChecks(certificate, (unusedCert, reason) => {
         invalidReason = reason;
     })
 
@@ -57,9 +57,8 @@ module.exports = {
         }
     },
     factoryCertificate: (keystore, shutdown) => {
-        return async (req, res) => {
-            await validateAndStoreNewCertificate(keystore, req, res);
-
+        return (req, res) => {
+            validateAndStoreNewCertificate(keystore, req, res);
             shutdown();
         };
     },
@@ -77,8 +76,8 @@ module.exports = {
         }
     },
     runtimeCertificate: (keystore) => {
-        return async (req, res) => {
-            await validateAndStoreNewCertificate(keystore, req, res);
+        return (req, res) => {
+            validateAndStoreNewCertificate(keystore, req, res);
         }
     }
 }
