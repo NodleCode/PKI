@@ -42,14 +42,18 @@ class FirmwareClient {
 
     // This call can be used to connect to a device and verify its certificates and possession
     // of its cryptographic materials by issuing it a challenge.
-    async verify(runtime, onCertificateValid, onCertificateInvalid) {
+    async verify(runtime, onCertificateValid, onVerificationFailed) {
         const details = await this.fetchDetails();
+
+        if (!this.challengeDevice(details.address, onVerificationFailed)) {
+            return false;
+        }
 
         // Set to false if at least one certificate is invalid
         let ret = true;
 
         for (const cert of details.certificates) {
-            const valid = await this.verifyIndividualCertificate(runtime, cert, details.address, onCertificateInvalid);
+            const valid = await this.verifyIndividualCertificate(runtime, cert, details.address, onVerificationFailed);
             if (!valid) {
                 ret = false; // Callback already called
             } else {
@@ -58,6 +62,27 @@ class FirmwareClient {
         }
 
         return ret;
+    }
+
+    // Send a challenge to the device to make it prove it is who it pretends to be
+    async challengeDevice(deviceAddress, onChallengeFailed) {
+        const challenge = crypto.randomBytes(100); // Size was chosen arbitrarily
+        const challengeHex = u8aToHex(challenge);
+        const reply = await axios.post(urljoin(this.url, PATH_CHALLENGE), {
+            challenge: challengeHex,
+        });
+        const signature = reply.data.signature;
+        if (signature === undefined) {
+            onChallengeFailed(cert, 'Invalid challenge response');
+            return false;
+        }
+        const keyring = new Keyring({ type: 'ed25519' });
+        const signerPair = keyring.addFromAddress(deviceAddress);
+        const deviceSignedTheChallenge = signerPair.verify(challenge, signature);
+        if (!deviceSignedTheChallenge) {
+            onChallengeFailed(cert, 'Challenge failed');
+            return false;
+        }
     }
 
     // Sub routine to proceed to a device verification, it verifies an individual certificate
@@ -73,25 +98,6 @@ class FirmwareClient {
         const certificateIsForThisDevice = decodedCertificate.payload.deviceAddress == deviceAddress;
         if (!certificateIsForThisDevice) {
             onCertificateInvalid(cert, 'Certificate address and device address mismatch');
-            return false;
-        }
-
-        // The certificate is valid and for this device, but is it who it pretends to be?
-        const challenge = crypto.randomBytes(100); // Size was chosen arbitrarily
-        const challengeHex = u8aToHex(challenge);
-        const reply = await axios.post(urljoin(this.url, PATH_CHALLENGE), {
-            challenge: challengeHex,
-        });
-        const signature = reply.data.signature;
-        if (signature === undefined) {
-            onCertificateInvalid(cert, 'Invalid challenge response');
-            return false;
-        }
-        const keyring = new Keyring({ type: 'ed25519' });
-        const signerPair = keyring.addFromAddress(deviceAddress);
-        const deviceSignedTheChallenge = signerPair.verify(challenge, signature);
-        if (!deviceSignedTheChallenge) {
-            onCertificateInvalid(cert, 'Challenge failed');
             return false;
         }
 
