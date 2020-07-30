@@ -1,4 +1,5 @@
 const { Certificate } = require('pki');
+const errors = require('./errors');
 
 const badRequest = (res, text) => {
     res.status(400).send({
@@ -32,14 +33,12 @@ const validateAndStoreNewCertificate = (keystore, req, res) => {
     const decoded = Certificate.decodeCertificate(certificate);
     const forThisDevice = decoded.payload.deviceAddress == keystore.account.address;
     if (!forThisDevice) {
-        badRequest(res, 'Certificate not intended for this device');
+        badRequest(res, errors.errNotForThisDevice);
         return;
     }
 
     keystore.saveCertificate(certificate);
     res.status(200).send({ accepted: true });
-
-    console.log('Certificate received and saved');
 }
 
 module.exports = {
