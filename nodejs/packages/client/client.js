@@ -42,34 +42,30 @@ class FirmwareClient {
 
     // This call can be used to connect to a device and verify its certificates and possession
     // of its cryptographic materials by issuing it a challenge.
-    async verify(runtime) {
+    async verify(runtime, onCertificateValid, onChallengeFailed, onVerificationFailed) {
         const details = await this.fetchDetails();
 
+        if (!this.challengeDevice(details.address, onChallengeFailed)) {
+            return false;
+        }
+
+        // Set to false if at least one certificate is invalid
+        let ret = true;
+
         for (const cert of details.certificates) {
-            if (!await this.verifyIndividualCertificate(runtime, cert, details.address)) {
-                return false;
+            const valid = await this.verifyIndividualCertificate(runtime, cert, details.address, onVerificationFailed);
+            if (!valid) {
+                ret = false; // Callback already called
+            } else {
+                onCertificateValid(cert);
             }
         }
 
-        return true;
+        return ret;
     }
 
-    // Sub routine to proceed to a device verification, it verifies an individual certificate
-    // sequentially
-    async verifyIndividualCertificate(runtime, cert, deviceAddress) {
-        const certificateIsValid = Certificate.verify(cert, runtime);
-        if (!certificateIsValid) {
-            throw new Error('the certificate is not valid');
-        }
-
-        // We know the certificate is valid but was it issued for this device
-        const decodedCertificate = Certificate.decodeCertificate(cert);
-        const certificateIsForThisDevice = decodedCertificate.payload.deviceAddress == deviceAddress;
-        if (!certificateIsForThisDevice) {
-            throw new Error('the certificate was not issued for this device');
-        }
-
-        // The certificate is valid and for this device, but is it who it pretends to be?
+    // Send a challenge to the device to make it prove it is who it pretends to be
+    async challengeDevice(deviceAddress, onChallengeFailed) {
         const challenge = crypto.randomBytes(100); // Size was chosen arbitrarily
         const challengeHex = u8aToHex(challenge);
         const reply = await axios.post(urljoin(this.url, PATH_CHALLENGE), {
@@ -77,21 +73,44 @@ class FirmwareClient {
         });
         const signature = reply.data.signature;
         if (signature === undefined) {
-            throw new Error('no signature present in challenge reply');
+            onChallengeFailed('Invalid challenge response');
+            return false;
         }
         const keyring = new Keyring({ type: 'ed25519' });
         const signerPair = keyring.addFromAddress(deviceAddress);
-        const deviceSignedTheChallenge = signerPair.verify(challenge, signature);
-        if (!deviceSignedTheChallenge) {
-            throw new Error('the device was not able to prove ownership of its keypair');
+        try {
+            const deviceSignedTheChallenge = signerPair.verify(challenge, signature);
+            if (!deviceSignedTheChallenge) {
+                onChallengeFailed('Challenge failed');
+                return false;
+            }
+        } catch (e) {
+            onChallengeFailed(`Signature verification error: ${e.toString()}`);
+            return false;
+        }
+
+        return true;
+    }
+
+    // Sub routine to proceed to a device verification, it verifies an individual certificate
+    // sequentially
+    async verifyIndividualCertificate(runtime, cert, deviceAddress, onCertificateInvalid) {
+        const certificateIsValid = await Certificate.verify(cert, runtime, onCertificateInvalid);
+        if (!certificateIsValid) {
+            return false; // Callback already called
+        }
+
+        // We know the certificate is valid but was it issued for this device
+        const decodedCertificate = Certificate.decodeCertificate(cert);
+        const certificateIsForThisDevice = decodedCertificate.payload.deviceAddress == deviceAddress;
+        if (!certificateIsForThisDevice) {
+            onCertificateInvalid(cert, 'Certificate address and device address mismatch');
+            return false;
         }
 
         // We did it!
         return true;
     }
-
-    // This call can be used to connect to a given device and issue it a new certificate,
-    // for instance, this could be useful when renewing a certificate, or maybe 
 }
 
 module.exports = FirmwareClient;

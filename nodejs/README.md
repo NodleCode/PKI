@@ -8,6 +8,13 @@ A set of node js module to handle our CLI our POC.
 docker build -t nodle/pki-utils .
 ```
 
+## Testing
+```
+yarn
+yarn run bootstrap
+yarn test
+```
+
 # Usage
 
 ## CLI

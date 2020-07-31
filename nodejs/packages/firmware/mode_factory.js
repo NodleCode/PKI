@@ -14,6 +14,8 @@ const enterFactoryMode = async (keystore, port, host) => {
     let closer = null;
     const server = express();
     const shutdownTheServer = () => {
+        console.log('Factory configuration set, switching to operating mode');
+
         closer.close();
         shutdownCalled = true;
     };

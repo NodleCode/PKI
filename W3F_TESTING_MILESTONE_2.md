@@ -99,7 +99,8 @@ $ pki-cli iot_verify http://elchapo.local:8080
 yarn run v1.22.4
 $ node ./packages/cli/index.js --ws-rpc ws://127.0.0.1:9944 iot_verify http://elchapo.local:8080
 Unknown types found, no types for Application
-Device has a valid and verified certificate
+VALID: eyJ2ZXJzaW9uIjoiMC4xIiwicGF5bG9hZCI6eyJkZXZpY2VBZGRyZXNzIjoiNUd4aUVmaWpDYXh1RXJIM1g0Qmh5dnZZTk5pNGN2QnFHWnY2YVVWMks2QzE4ZnVRIiwic2lnbmVyQWRkcmVzcyI6IjVFelBOakp1NERMYXBQY24zY3o2UnVTd0tiRDI1a0tIcXloQ2pVWVpuMTMyY280SiIsImNyZWF0aW9uRGF0ZSI6MTU5NTg2OTg4OCwiZXhwaXJhdGlvbkRhdGUiOjE1OTg1NDgyODh9LCJoYXNoIjoiMHgwOGMyYmJlMDAxNGVkNmZkODkwYzg1MGZhMDI0NDkxYjdhNjgyYjdlYmU2ZTc3MzYzMDRiOTM5MTA1MTNjODRjYjliN2Y1MjUzZTI1M2UyM2ZiZTJjMjQwYjg1ZWE1ZTg3NjhkYzZkYjgxOWI1ZGIzNTkyNGJlYzJjNmUxMjBiNyIsInNpZ25hdHVyZSI6IjB4OGNiZWZjZDg5YjNmNDZmMGNmODk1MmJiMDUxZWVkMjU0MjIzZjRhZTFhZDdjYjNjY2Y3N2E0Zjg3YjgxOWY0MGZjNDgyODk1ZGY3ZjIzOGQ5OGE5ZDcxMmI2MTM1NzJmY2I1YjQwYTQwY2FiMTQ5MTU5OTZiMzJhYzFmMmMxMGIifQ==
+Device has at least one invalid certificate
 ✨  Done in 1.11s.
 ```
 
@@ -123,4 +124,13 @@ The goal of using certificates is to know if a device is genuine or not. Let's s
 
 ### Verify the rogue device's certificate
 
-We can now process to the verification again, the `iot_verify` command will throw an error and the UI will display an error message too.
+We can now process to the verification again, the `iot_verify` will have an output similar to the following (for this example we revoked the root certificate instead so you may have a slightly different error displayed):
+```
+pki-cli iot_verify http://elchapo.local:8080
+yarn run v1.22.4
+$ node ./packages/cli/index.js --ws-rpc ws://127.0.0.1:9944 iot_verify http://localhost:8080
+Unknown types found, no types for Application
+INVALID (Root / Child does not exist or was revoked): eyJ2ZXJzaW9uIjoiMC4xIiwicGF5bG9hZCI6eyJkZXZpY2VBZGRyZXNzIjoiNUd4aUVmaWpDYXh1RXJIM1g0Qmh5dnZZTk5pNGN2QnFHWnY2YVVWMks2QzE4ZnVRIiwic2lnbmVyQWRkcmVzcyI6IjVFelBOakp1NERMYXBQY24zY3o2UnVTd0tiRDI1a0tIcXloQ2pVWVpuMTMyY280SiIsImNyZWF0aW9uRGF0ZSI6MTU5NTg2OTg4OCwiZXhwaXJhdGlvbkRhdGUiOjE1OTg1NDgyODh9LCJoYXNoIjoiMHgwOGMyYmJlMDAxNGVkNmZkODkwYzg1MGZhMDI0NDkxYjdhNjgyYjdlYmU2ZTc3MzYzMDRiOTM5MTA1MTNjODRjYjliN2Y1MjUzZTI1M2UyM2ZiZTJjMjQwYjg1ZWE1ZTg3NjhkYzZkYjgxOWI1ZGIzNTkyNGJlYzJjNmUxMjBiNyIsInNpZ25hdHVyZSI6IjB4OGNiZWZjZDg5YjNmNDZmMGNmODk1MmJiMDUxZWVkMjU0MjIzZjRhZTFhZDdjYjNjY2Y3N2E0Zjg3YjgxOWY0MGZjNDgyODk1ZGY3ZjIzOGQ5OGE5ZDcxMmI2MTM1NzJmY2I1YjQwYTQwY2FiMTQ5MTU5OTZiMzJhYzFmMmMxMGIifQ==
+Device has at least one invalid certificate
+✨  Done in 0.94s.
+```

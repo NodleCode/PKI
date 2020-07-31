@@ -1,4 +1,3 @@
-
 const { Keyring } = require('@polkadot/api');
 const { randomAsU8a } = require('@polkadot/util-crypto');
 const { hexToU8a, u8aToHex } = require('@polkadot/util');
@@ -27,7 +26,7 @@ class Keystore {
         this.certificates = parsed.certificates;
     }
 
-    generateAndSaveKeystore(path) {
+    generateAndSaveKeystore() {
         const seed = randomAsU8a(32);
         this.seed = seed;
 

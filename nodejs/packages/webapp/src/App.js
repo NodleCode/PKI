@@ -23,15 +23,28 @@ class App extends React.Component {
     await runtime.connect();
 
     const client = new FirmwareClient(this.state.url);
-    try {
-      await client.verify(runtime);
 
-      toaster.success('Succesfully verified the device certificate', {
+    const onValidCert = (cert) => {
+      console.log(`Valid cert: ${cert}`);
+    }
+
+    const onChallengeFailed = (reason) => {
+      console.log(`Challenge failed: ${reason}`);
+    }
+
+    const onInvalidCert = (cert, reason) => {
+      console.log(`Invalid cert (${reason}): ${cert}`);
+    }
+
+    const valid = await client.verify(runtime, onValidCert, onChallengeFailed, onInvalidCert);
+
+    if (valid) {
+      toaster.success('Succesfully verified the device certificates', {
         description: 'In a live production deployment this is when we would negotiate a secure session and continue our operations.',
       });
-    } catch (e) {
-      toaster.danger('Certificate is not genuine', {
-        description: e.toString() + '.',
+    } else {
+      toaster.danger('At least one certificate is not genuine', {
+        description: 'More informations may be available in the console. In a live production deployment we could decide to either stop the operations or continue if one correct certificate is present.',
       });
     }
 

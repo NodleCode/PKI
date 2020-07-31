@@ -1,4 +1,5 @@
 const { Certificate } = require('pki');
+const errors = require('./errors');
 
 const badRequest = (res, text) => {
     res.status(400).send({
@@ -19,20 +20,25 @@ const validateAndStoreNewCertificate = (keystore, req, res) => {
     // us.
     // We wrap the call in a try catch as a decoding error may happen
     // with malicious entries.
-    try {
-        if (!Certificate.verifyCertificateWithoutIssuerChecks(certificate)) {
-            badRequest(res, 'certificate is not for this device');
-            return;
-        }
-    } catch (error) {
-        badRequest(res, `an error happened while decoding your certificate: ${error.toString()}`);
+    let invalidReason = '';
+    const valid = Certificate.verifyCertificateWithoutIssuerChecks(certificate, (unusedCert, reason) => {
+        invalidReason = reason;
+    })
+
+    if (!valid) {
+        badRequest(res, `Invalid certificate: ${invalidReason}`);
+        return;
+    }
+
+    const decoded = Certificate.decodeCertificate(certificate);
+    const forThisDevice = decoded.payload.deviceAddress == keystore.account.address;
+    if (!forThisDevice) {
+        badRequest(res, errors.errNotForThisDevice);
         return;
     }
 
     keystore.saveCertificate(certificate);
     res.status(200).send({ accepted: true });
-
-    console.log('Certificate received and saved');
 }
 
 module.exports = {
@@ -52,7 +58,6 @@ module.exports = {
     factoryCertificate: (keystore, shutdown) => {
         return (req, res) => {
             validateAndStoreNewCertificate(keystore, req, res);
-
             shutdown();
         };
     },

@@ -1,9 +1,12 @@
+const errors = require('./errors');
 const { Keyring } = require('@polkadot/api');
 const { u8aToHex, u8aToU8a } = require('@polkadot/util');
 const blake = require('blakejs')
 const moment = require('moment');
 
 class Certificate {
+	version = '0.1'
+
 	constructor(description) {
 		this.deviceAddress = description.device;
 		this.signerKeypair = description.pair;
@@ -28,17 +31,17 @@ class Certificate {
 		const u8aSignature = this.signerKeypair.sign(u8aHash);
 
 		return {
-			version: '0.1',
+			version: this.version,
 			payload: rawMessage,
 			hash: u8aToHex(u8aHash),
 			signature: u8aToHex(u8aSignature)
-		}
+		};
 	}
 
 	signAndEncode() {
 		const signed = this.sign();
 
-		return Buffer.from(JSON.stringify(signed)).toString('base64')
+		return Buffer.from(JSON.stringify(signed)).toString('base64');
 	}
 
 	static decodeCertificate(encodedCertificate) {
@@ -47,16 +50,17 @@ class Certificate {
 		return JSON.parse(json);
 	}
 
-	static verifyCertificateWithoutIssuerChecks(encodedCertificate) {
+	static verifyCertificateWithoutIssuerChecks(encodedCertificate, onCertificateInvalid) {
 		const decoded = this.decodeCertificate(encodedCertificate);
 
 		if (decoded.version !== '0.1') {
-			throw new Error('unknown certificate version');
+			onCertificateInvalid(encodedCertificate, errors.errUnsupportedVersion);
+			return false;
 		}
 
 		const expired = moment.unix(decoded.payload.expirationDate).isBefore();
 		if (expired) {
-			console.log('Certificate expired');
+			onCertificateInvalid(encodedCertificate, errors.errExpired);
 			return false
 		}
 
@@ -71,32 +75,32 @@ class Certificate {
 
 		const hashMatch = decoded.hash == u8aToHex(u8aHash);
 		if (!hashMatch) {
-			console.log('Certificate hash mismatch');
+			onCertificateInvalid(encodedCertificate, errors.errHashMismatch);
 			return false
 		}
 
 		const signatureOk = signerPair.verify(u8aHash, u8aToU8a(decoded.signature));
 		if (!signatureOk) {
-			console.log('Certificate signature unverified');
+			onCertificateInvalid(encodedCertificate, errors.errBadSignature)
 			return false
 		}
 
 		return true;
 	}
 
-	static async verify(encodedCertificate, runtime) {
-		if (!this.verifyCertificateWithoutIssuerChecks(encodedCertificate)) {
-			return false;
+	static async verify(encodedCertificate, runtime, onCertificateInvalid) {
+		if (!this.verifyCertificateWithoutIssuerChecks(encodedCertificate, onCertificateInvalid)) {
+			return false; // Callback already called
 		}
 
 		const decoded = this.decodeCertificate(encodedCertificate);
 		const chainStateOk = await runtime.rootAndChildValid(decoded.payload.signerAddress, decoded.payload.deviceAddress);
 		if (chainStateOk == false) {
-			console.log('Root / Child not valid or revoked');
-			return false
+			onCertificateInvalid(encodedCertificate, errors.errChainSaysInvalid)
+			return false;
 		}
 
-		return true
+		return true;
 	}
 }
 

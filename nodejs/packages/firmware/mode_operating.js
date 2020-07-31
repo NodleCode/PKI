@@ -11,7 +11,7 @@ const enterOperatingMode = async (keystore, port, host) => {
     server.use(cors());
     server.get('/identity', handlers.identity(keystore));
     server.post('/challenge', handlers.challenge(keystore));
-    server.post('/certificate', handlers.runtimeCertificate(keystore))
+    server.post('/certificate', handlers.runtimeCertificate(keystore));
     server.listen(port, host);
 
     // We want this function to be blocking indefinitely.

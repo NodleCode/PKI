@@ -148,6 +148,6 @@ And now, notice how the certificate is invalidated.
 ```
 $ pki-cli verify $CERT
 Unknown types found, no types for Application
-Root / Child not valid or revoked
-Certificate is NOT valid
+Certificate is not valid: Root / Child does not exist or was revoked
+Certificate is not valid, see before for more details
 ```

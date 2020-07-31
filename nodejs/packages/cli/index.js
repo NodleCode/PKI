@@ -85,10 +85,14 @@ require('yargs')
 			const runtime = new Runtime(argv.wsRpc);
 			await runtime.connect();
 
-			if (await Certificate.verify(argv.certificate, runtime)) {
+			const valid = await Certificate.verify(argv.certificate, runtime, (unusedCert, reason) => {
+				console.log(`Certificate is not valid: ${reason}`);
+			});
+
+			if (valid) {
 				console.log('Certificate is valid');
 			} else {
-				console.log('Certificate is NOT valid');
+				console.log('Certificate is not valid, see before for more details');
 			}
 
 			process.exit(0);
@@ -202,8 +206,25 @@ require('yargs')
 			await runtime.connect();
 
 			const client = new FirmwareClient(argv.url);
-			if (await client.verify(runtime)) {
-				console.log('Device has a valid and verified certificate');
+
+			const onValid = (cert) => {
+				console.log(`VALID: ${cert}`);
+			}
+
+			const onChallengeFailed = (reason) => {
+				console.log(`CHALLENGE FAILED: ${reason}`);
+			}
+
+			const onCertificateInvalid = (cert, reason) => {
+				console.log(`INVALID (${reason}): ${cert}`);
+			}
+
+			const valid = await client.verify(runtime, onValid, onChallengeFailed, onCertificateInvalid);
+
+			if (valid) {
+				console.log('All certificates valid');
+			} else {
+				console.log('Device has at least one invalid certificate');
 			}
 
 			process.exit(0);
