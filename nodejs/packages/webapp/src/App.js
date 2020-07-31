@@ -28,11 +28,15 @@ class App extends React.Component {
       console.log(`Valid cert: ${cert}`);
     }
 
+    const onChallengeFailed = (reason) => {
+      console.log(`Challenge failed: ${reason}`);
+    }
+
     const onInvalidCert = (cert, reason) => {
       console.log(`Invalid cert (${reason}): ${cert}`);
     }
 
-    const valid = await client.verify(runtime, onValidCert, onInvalidCert);
+    const valid = await client.verify(runtime, onValidCert, onChallengeFailed, onInvalidCert);
 
     if (valid) {
       toaster.success('Succesfully verified the device certificates', {

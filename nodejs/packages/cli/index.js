@@ -211,11 +211,15 @@ require('yargs')
 				console.log(`VALID: ${cert}`);
 			}
 
-			const onInvalid = (cert, reason) => {
+			const onChallengeFailed = (reason) => {
+				console.log(`CHALLENGE FAILED: ${reason}`);
+			}
+
+			const onCertificateInvalid = (cert, reason) => {
 				console.log(`INVALID (${reason}): ${cert}`);
 			}
 
-			const valid = await client.verify(runtime, onValid, onInvalid);
+			const valid = await client.verify(runtime, onValid, onChallengeFailed, onCertificateInvalid);
 
 			if (valid) {
 				console.log('All certificates valid');

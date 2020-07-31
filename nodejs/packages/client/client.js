@@ -42,10 +42,10 @@ class FirmwareClient {
 
     // This call can be used to connect to a device and verify its certificates and possession
     // of its cryptographic materials by issuing it a challenge.
-    async verify(runtime, onCertificateValid, onVerificationFailed) {
+    async verify(runtime, onCertificateValid, onChallengeFailed, onVerificationFailed) {
         const details = await this.fetchDetails();
 
-        if (!this.challengeDevice(details.address, onVerificationFailed)) {
+        if (!this.challengeDevice(details.address, onChallengeFailed)) {
             return false;
         }
 
@@ -73,16 +73,23 @@ class FirmwareClient {
         });
         const signature = reply.data.signature;
         if (signature === undefined) {
-            onChallengeFailed(cert, 'Invalid challenge response');
+            onChallengeFailed('Invalid challenge response');
             return false;
         }
         const keyring = new Keyring({ type: 'ed25519' });
         const signerPair = keyring.addFromAddress(deviceAddress);
-        const deviceSignedTheChallenge = signerPair.verify(challenge, signature);
-        if (!deviceSignedTheChallenge) {
-            onChallengeFailed(cert, 'Challenge failed');
+        try {
+            const deviceSignedTheChallenge = signerPair.verify(challenge, signature);
+            if (!deviceSignedTheChallenge) {
+                onChallengeFailed('Challenge failed');
+                return false;
+            }
+        } catch (e) {
+            onChallengeFailed(`Signature verification error: ${e.toString()}`);
             return false;
         }
+
+        return true;
     }
 
     // Sub routine to proceed to a device verification, it verifies an individual certificate
